@@ -2,12 +2,8 @@ import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { edges, auditLog } from "@/db/schema";
-import {
-  createNode,
-  createEdge,
-  confirmEdge,
-  getProvenance,
-} from "@/lib/graph";
+import { createNode, createEdge, confirmEdge, getProvenance } from "@/lib/graph";
+import { resetGraph, pgErrorMessage, TEST_PROJECT as PROJECT } from "./test-helpers";
 
 /**
  * 验收测试对应 Phase0-开工计划.md 0.1 的四条硬约束：
@@ -15,27 +11,7 @@ import {
  * ② 无出处的边写入被拒
  * ③ audit_log / 已确认记录不可 UPDATE/DELETE
  * ④ 出处链完整可查
- *
- * TRUNCATE（而非 DELETE）绕过我们自己的 append-only 触发器，
- * 是测试之间重置状态的干净方式。
  */
-async function resetGraph() {
-  await db.execute(
-    sql`TRUNCATE TABLE audit_log, provenance, edges, nodes RESTART IDENTITY CASCADE`,
-  );
-}
-
-/**
- * postgres-js 把驱动层错误包在 `.cause` 里，顶层 `.message` 只是
- * "Failed query: ..."。真正的 RAISE EXCEPTION 文本要看 `.cause.message`。
- */
-function pgErrorMessage(err: unknown): string {
-  const cause = (err as { cause?: { message?: string } })?.cause;
-  return cause?.message ?? String(err);
-}
-
-const PROJECT = "00000000-0000-0000-0000-000000000001";
-
 describe("图内核硬约束", () => {
   beforeEach(resetGraph);
   afterAll(resetGraph);

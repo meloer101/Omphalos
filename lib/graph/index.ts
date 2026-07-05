@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { nodes, edges, provenance, auditLog } from "@/db/schema";
-import { edgeRiskOf, type EdgeType, type NodeType } from "@/db/enums";
+import { edgeRiskOf, type BoardStatus, type EdgeType, type NodeType } from "@/db/enums";
 import type { Node, Edge } from "@/db/schema";
 
 /**
@@ -167,4 +167,78 @@ export async function listNodesByType(projectId: string, type: NodeType) {
     .select()
     .from(nodes)
     .where(and(eq(nodes.projectId, projectId), eq(nodes.type, type)));
+}
+
+/** 取单个节点，节点详情页（中央变形栏）的入口查询。 */
+export async function getNode(nodeId: string): Promise<Node | undefined> {
+  const [node] = await db.select().from(nodes).where(eq(nodes.id, nodeId));
+  return node;
+}
+
+/** 供"连边目标选择器"做搜索/下拉——同项目下的全部节点。 */
+export async function listAllNodes(projectId: string): Promise<Node[]> {
+  return db.select().from(nodes).where(eq(nodes.projectId, projectId));
+}
+
+export interface UpdateNodeInput {
+  title?: string;
+  body?: Record<string, unknown>;
+  boardStatus?: BoardStatus;
+}
+
+/**
+ * 编辑节点内容/看板状态。不写 audit_log——audit_log 的四个动作
+ * （proposed/confirmed/rejected/reverted）本来就不含"编辑"，字段级
+ * 编辑历史不在 Phase 0 范围内。`nodes_touch_updated_at` 触发器会
+ * 自动戳 updated_at。DB 的 `nodes_guard` 触发器仍然保证：已确认
+ * 节点的 type/project_id 不可变（title/body/boardStatus 仍可编辑）。
+ */
+export async function updateNode(
+  nodeId: string,
+  input: UpdateNodeInput,
+): Promise<Node> {
+  const [node] = await db
+    .update(nodes)
+    .set(input)
+    .where(eq(nodes.id, nodeId))
+    .returning();
+  return node;
+}
+
+/** 确认一个提议中的节点（镜像 confirmEdge）。 */
+export async function confirmNode(nodeId: string, actor: string): Promise<Node> {
+  return db.transaction(async (tx) => {
+    const [node] = await tx
+      .update(nodes)
+      .set({ status: "confirmed" })
+      .where(eq(nodes.id, nodeId))
+      .returning();
+
+    await tx.insert(auditLog).values({
+      targetType: "node",
+      targetId: node.id,
+      action: "confirmed",
+      actor,
+    });
+
+    return node;
+  });
+}
+
+/**
+ * 删除一个提议中的节点（镜像 rejectEdge：图无污染，历史留在
+ * audit_log）。若节点已确认，DB 的 `nodes_guard` 触发器会拒绝并
+ * 让整个事务（含 audit 插入）回滚——不会留下"删了但没删成"的
+ * 脏审计记录。
+ */
+export async function deleteNode(nodeId: string, actor: string): Promise<void> {
+  await db.transaction(async (tx) => {
+    await tx.insert(auditLog).values({
+      targetType: "node",
+      targetId: nodeId,
+      action: "rejected",
+      actor,
+    });
+    await tx.delete(nodes).where(eq(nodes.id, nodeId));
+  });
 }

@@ -8,7 +8,13 @@ import {
   real,
   timestamp,
 } from "drizzle-orm/pg-core";
-import { NODE_TYPES, EDGE_TYPES, EDGE_STATUS, AUDIT_ACTIONS } from "./enums";
+import {
+  NODE_TYPES,
+  EDGE_TYPES,
+  EDGE_STATUS,
+  AUDIT_ACTIONS,
+  BOARD_STATUSES,
+} from "./enums";
 
 // Enums derived from the single source of truth (db/enums.ts) — never
 // hand-edit these arrays here, edit db/enums.ts and regenerate.
@@ -17,6 +23,7 @@ export const edgeTypeEnum = pgEnum("edge_type", EDGE_TYPES);
 export const edgeRiskEnum = pgEnum("edge_risk", ["high", "low"]);
 export const statusEnum = pgEnum("status", EDGE_STATUS);
 export const auditActionEnum = pgEnum("audit_action", AUDIT_ACTIONS);
+export const boardStatusEnum = pgEnum("board_status", BOARD_STATUSES);
 
 /**
  * 四类节点：证据 / 需求 / 任务 / 结果。project_id 是逻辑 scope 字段
@@ -31,6 +38,9 @@ export const nodes = pgTable("nodes", {
   title: text("title").notNull(),
   body: jsonb("body").notNull().default({}),
   status: statusEnum("status").notNull().default("proposed"),
+  // 仅 task 类型节点使用；其他类型忽略这个字段。与上面的 status
+  // （信任账本轴）是两件完全不同的事，不要混用。
+  boardStatus: boardStatusEnum("board_status").notNull().default("todo"),
   embedding: vector("embedding", { dimensions: 1536 }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()

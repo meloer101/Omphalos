@@ -38,6 +38,15 @@ export const auditActionSchema = z.enum(AUDIT_ACTIONS);
 export type AuditAction = z.infer<typeof auditActionSchema>;
 
 /**
+ * 看板工作流状态——只对 task 类型节点有意义，与 nodes.status
+ * （提议中/已确认的信任账本轴）是完全独立的两件事，不要混用。
+ * 见 Phase0-开工计划.md 0.2 的 schema 决定记录。
+ */
+export const BOARD_STATUSES = ["todo", "in_progress", "done"] as const;
+export const boardStatusSchema = z.enum(BOARD_STATUSES);
+export type BoardStatus = z.infer<typeof boardStatusSchema>;
+
+/**
  * 低风险边自动生效可撤销；高风险边（将来会被当事实查的边）必须人显式确认。
  * 见 Agent架构设计.md 决策点 9。
  */

@@ -131,14 +131,19 @@ omphalos/
   - 一跳邻域（非完整 k 跳遍历）对 Phase 0 已足够；k 跳上下文装配是 P1 Agent 运行时的事（见 Agent架构设计.md 5.1）
 - [x] **验收测试（vitest，全绿）**：① 非法边类型报错（原生 ENUM） ② 无出处边写入被拒（deferred trigger） ③ audit_log 不可 UPDATE/DELETE；已确认边不可删除/改关键字段 ④ 出处链完整可查（谁创建/基于什么/置信度）
 
-### 0.2 工作台外壳 + 四视图（Day 5-8）—— 🚧 进行中（外壳骨架已搭，CRUD 待接图内核）
-- [x] 三栏布局外壳（左导航 / 中变形栏 / 右侧栏占位，AI 侧栏 P1 才填）—— 已用 preview 验证导航与渲染无误
-- [ ] 反馈收件箱：证据节点列表 CRUD
-- [ ] 看板：任务节点按状态列（dnd-kit 拖拽改状态）
-- [ ] 节点详情页 `/node/[id]`：中央变形栏 + tabs（正文 / 关联边 / 出处）
-- [ ] 结果节点：手动录入指标快照表单（**P0 就纳入**）
-- [ ] 手动连边 UI：任意节点选类型→选目标→（高风险边）填出处→建边
-- [ ] 单一数据源验证：一处改动，多视图即时刷新
+### 0.2 工作台外壳 + 四视图（Day 5-8）—— ✅ 完成 2026-07-05
+- [x] 三栏布局外壳（左导航 / 中变形栏 / 右侧栏占位，AI 侧栏 P1 才填）
+- [x] 反馈收件箱：证据节点列表 CRUD（`app/(workbench)/inbox`）
+- [x] 看板：任务节点按状态列，`@dnd-kit` 拖拽改 `board_status`（`app/(workbench)/board` + `components/board-client.tsx`）
+- [x] 节点详情页 `/node/[id]`：中央变形栏 + tabs（正文 / 关联边 / 出处），outcome 类型专属指标表单
+- [x] 结果节点：手动录入指标快照表单
+- [x] 手动连边 UI：边类型下拉 + `NodePicker`（选已有或即时新建目标节点）+ 可选"为什么"写入出处
+- [x] 单一数据源验证：Server Component 直读 Postgres，无客户端缓存，`revalidatePath` 保证多视图同步
+
+**新增 schema（决策记录）**：`nodes.board_status` 枚举列（todo/in_progress/done），与 `nodes.status`（提议中/已确认信任账本轴）正交独立，见迁移 `0002_task_board_status.sql`。手动创建的节点/边默认 `proposed`，通过详情页/收件箱的"确认"按钮进入信任账本——CRUD 需求与已有硬约束（已确认不可删除）完全兼容。
+
+**验证方式的调整（重要）**：浏览器自动化点击在这次的 preview 环境里遇到工具本身的限制——点击/`.click()`/`requestSubmit()` 均确认事件到达 DOM，但未能触发 React 19 对 `<form action={serverAction}>` 的拦截（先后排除了两个假说：viewport 过窄导致 `<aside>` 遮挡按钮的真实布局 bug，已修复；以及 stale HMR 的 action 引用，重启+清缓存后依旧复现）。用 curl 直接构造 Next.js 的 no-JS 渐进增强表单编码（`$ACTION_ID_xxx` + multipart/form-data）验证了 `createEvidence` 端到端可用（写库+重渲染），证明底层机制正确；随后补充 `db/__tests__/node-crud.test.ts`（5 个用例，覆盖 `getNode`/`updateNode`/`confirmNode`/`deleteNode`/`listAllNodes`）作为新函数的主要验证手段，全部通过。最后用脚本直接调用 `lib/graph` 跑通完整出口验收链（3 证据→1 需求 supports→2 任务 implements→1 结果 validates），并在浏览器中逐页 `preview_snapshot` 视觉确认渲染正确（收件箱/看板/需求详情/结果指标表单/出处 tab 全部截图核对）。
+- **副产品修复**：`vitest.config.ts` 加 `fileParallelism: false`——两个测试文件共享同一本地 Postgres 并用 TRUNCATE 重置状态，并行跑文件会互相冲突甚至死锁，这个坑不修会在 CI 里更隐蔽地复现。
 
 ### 0.3 文档编辑器 spike（Day 5，与 0.2 并行）
 - [ ] TipTap 与 BlockNote 各接一个最小 demo，存 JSONB、读回渲染

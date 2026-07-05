@@ -15,6 +15,13 @@
       "when": 1783278870210,
       "tag": "0001_graph_kernel_guardrails",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783288526828,
+      "tag": "0002_task_board_status",
+      "breakpoints": true
     }
   ]
 }
