@@ -105,31 +105,34 @@ omphalos/
 | at | timestamptz | |
 
 ### 硬约束（数据库层，不靠应用自觉）
-- [ ] `edges.type` / `nodes.type` check 约束绑定枚举 —— 非法类型写入直接报错
-- [ ] **append-only 触发器**：`audit_log` 与 provenance 的确认记录禁止 UPDATE/DELETE（`BEFORE UPDATE OR DELETE ... RAISE EXCEPTION`）
-- [ ] 边写入触发器：无对应 provenance 行的 edge 插入被拒
-- [ ] 手写 SQL 迁移承载上述触发器（drizzle-kit 不生成触发器，单独 SQL 文件）
+- [x] `edges.type` / `nodes.type` 绑定枚举 —— Postgres 原生 ENUM 类型即已保证非法值报错，无需额外 CHECK
+- [x] **append-only 触发器**：`audit_log` 禁止 UPDATE/DELETE；`provenance` 禁止 UPDATE（DELETE 允许级联，用于拒绝态提议的清理）
+- [x] 边写入触发器：deferred constraint trigger，无 provenance 行的 edge 在事务提交时被拒
+- [x] 手写 SQL 迁移承载上述触发器（`db/migrations/0001_graph_kernel_guardrails.sql`）
+- [x] 额外加固（超出原计划）：`edges`/`nodes` 已确认后不可删除、关键字段不可改（"trust ledger"）；risk 由 DB 触发器权威派生，不信任应用层
 
 ---
 
 ## 四、任务分解（勾选推进）
 
-### 0.0 环境与地基（Day 1）
-- [ ] `create-next-app`（TS、App Router、Tailwind）
-- [ ] Supabase CLI 初始化 + 本地栈起 Postgres+pgvector（`supabase start`）
-- [ ] Drizzle 接入 + drizzle.config + 首个空迁移跑通
-- [ ] `.env.local` 约定（DB_URL、LITELLM_BASE_URL、DEEPSEEK_API_KEY）+ `.env.example` 提交
-- [ ] CI：lint + typecheck + `drizzle-kit` 迁移校验
+### 0.0 环境与地基（Day 1）—— ✅ 完成 2026-07-05
+- [x] `create-next-app`（TS、App Router、Tailwind、Next.js 16 + Turbopack）
+- [x] Supabase CLI 初始化 + 本地栈起 Postgres+pgvector（`supabase start`）
+- [x] Drizzle 接入 + drizzle.config + 首个空迁移跑通
+- [x] `.env.local` 约定（DB_URL、LITELLM_BASE_URL、DEEPSEEK_API_KEY）+ `.env.example` 提交
+- [x] CI：GitHub Actions，lint + typecheck + test + build（用 `pgvector/pgvector:pg17` 作为服务，而非完整 Supabase 栈）
+- 备忘：Next.js 16 breaking changes 已核对（`params`/`searchParams` 全部转 Promise，需 `await`；`middleware`→`proxy`；本项目 Phase 0 尚无 middleware，不受影响）
 
-### 0.1 图内核（Day 2-4）
-- [ ] enums.ts（zod + drizzle 同源）
-- [ ] schema.ts 四张表
-- [ ] 手写 SQL 迁移：check 约束 + append-only 触发器 + 无出处边拒绝触发器
-- [ ] `lib/graph`：建节点 / 连边（校验出处）/ 查 k 跳邻域 / 查出处链 / 改状态（写 audit）
-- [ ] **验收测试（vitest）**：① 非法边类型报错 ② 无出处边被拒 ③ audit/确认记录 UPDATE/DELETE 报错 ④ 出处链完整可查
+### 0.1 图内核（Day 2-4）—— ✅ 完成 2026-07-05
+- [x] enums.ts（zod + drizzle 同源，`edgeRiskOf()` 计算高/低风险）
+- [x] schema.ts 四张表（nodes/edges/provenance/audit_log）
+- [x] 手写 SQL 迁移：见上方硬约束清单
+- [x] `lib/graph`：建节点 / 连边（同事务写出处）/ 确认 / 拒绝（删除+留 audit）/ 查一跳邻域 / 查出处链
+  - 一跳邻域（非完整 k 跳遍历）对 Phase 0 已足够；k 跳上下文装配是 P1 Agent 运行时的事（见 Agent架构设计.md 5.1）
+- [x] **验收测试（vitest，全绿）**：① 非法边类型报错（原生 ENUM） ② 无出处边写入被拒（deferred trigger） ③ audit_log 不可 UPDATE/DELETE；已确认边不可删除/改关键字段 ④ 出处链完整可查（谁创建/基于什么/置信度）
 
-### 0.2 工作台外壳 + 四视图（Day 5-8）
-- [ ] 三栏布局外壳（左导航 / 中变形栏 / 右侧栏占位，AI 侧栏 P1 才填）
+### 0.2 工作台外壳 + 四视图（Day 5-8）—— 🚧 进行中（外壳骨架已搭，CRUD 待接图内核）
+- [x] 三栏布局外壳（左导航 / 中变形栏 / 右侧栏占位，AI 侧栏 P1 才填）—— 已用 preview 验证导航与渲染无误
 - [ ] 反馈收件箱：证据节点列表 CRUD
 - [ ] 看板：任务节点按状态列（dnd-kit 拖拽改状态）
 - [ ] 节点详情页 `/node/[id]`：中央变形栏 + tabs（正文 / 关联边 / 出处）

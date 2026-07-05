@@ -19,6 +19,21 @@
 - [PRD-MVP.md](./PRD-MVP.md) —— MVP 需求文档
 - [开源选型表.md](./开源选型表.md) —— 相关开源项目的解剖与借鉴
 - [Roadmap.md](./Roadmap.md) —— 分阶段开发计划与出口标准
+- [Phase0-开工计划.md](./Phase0-开工计划.md) —— 当前阶段的技术栈定案与任务分解
+
+## 开发
+
+技术栈：Next.js（TS）+ Drizzle + Postgres/pgvector（本地走 Supabase CLI，上线迁移 Supabase 云）+ Vercel AI SDK → LiteLLM → DeepSeek。
+
+```bash
+pnpm install
+cp .env.example .env.local   # 按本地 supabase status 填 DATABASE_URL
+pnpm supabase:start          # 起本地 Postgres+pgvector（首次会拉取镜像，较慢）
+pnpm db:migrate              # 应用迁移（含图内核的硬约束触发器）
+pnpm dev
+```
+
+常用命令：`pnpm test`（vitest）、`pnpm typecheck`、`pnpm lint`、`pnpm db:studio`（Drizzle Studio 查图）。
 
 ## 目标用户
 
