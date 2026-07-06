@@ -1,0 +1,77 @@
+import { generateText, tool } from "ai";
+import { getDefaultModel } from "@/lib/ai/client";
+import type { AgentContract } from "./contract";
+
+/**
+ * 运行时执行器（Agent架构设计.md 5.2/5.3）：图事件触发 → 上下文装配 →
+ * LLM 调用 → zod 校验 → 写提议态节点/边。四份合同共用这一条流水线，
+ * 差异全部封装在 contract 里（Phase1-开工计划.md 决策 D）。
+ *
+ * 结构化输出策略锁定为 tool-calling + toolChoice:'auto'——`generateObject`
+ * /`Output.object()` 与强制 `tool_choice` 在 deepseek-v4-pro 上都是死路，
+ * 已在 Phase0-开工计划.md 0.4 压测验证（20/20 成功率）。
+ *
+ * 重试/死信不在这里手动实现：pg-boss 队列级的 retryLimit + deadLetter
+ * （lib/queue/boss.ts）已经就是这件事该用的机制——runPipeline 只管一次
+ * 尝试，失败就抛错，交给调用方（worker 的 job handler，进而是 pg-boss）
+ * 处理重试与死信路由。
+ */
+
+const TOOL_NAME = "submit_structured_output";
+
+export interface PipelineResult<TOutput> {
+  output: TOutput;
+  nodeIds: string[];
+  edgeIds: string[];
+}
+
+export class PipelineOutputError extends Error {
+  constructor(contractName: string, cause: unknown) {
+    super(`${contractName} 合同：模型输出未通过校验`, { cause });
+    this.name = "PipelineOutputError";
+  }
+}
+
+export async function runPipeline<TInput, TOutput>(
+  contract: AgentContract<TInput, TOutput>,
+  input: TInput,
+): Promise<PipelineResult<TOutput>> {
+  const ctx = await contract.assembleContext(input);
+  const { system, prompt } = contract.buildPrompt(input, ctx);
+
+  const result = await generateText({
+    model: getDefaultModel(),
+    system,
+    tools: {
+      [TOOL_NAME]: tool({
+        description: `提交 ${contract.name} 合同要求的结构化输出`,
+        inputSchema: contract.outputSchema,
+      }),
+    },
+    toolChoice: "auto",
+    prompt,
+  });
+
+  const call = result.toolCalls.find((c) => c.toolName === TOOL_NAME);
+  if (!call) {
+    throw new PipelineOutputError(
+      contract.name,
+      new Error(
+        "模型没有调用工具（只回了文字）——见 Phase0-开工计划.md 0.4：" +
+          "deepseek-v4-pro 靠 prompt 明确要求调用工具才稳定，检查 buildPrompt 措辞",
+      ),
+    );
+  }
+
+  const parsed = contract.outputSchema.safeParse(call.input);
+  if (!parsed.success) {
+    throw new PipelineOutputError(contract.name, parsed.error);
+  }
+
+  const { nodeIds, edgeIds } = await contract.applyOutput(
+    input,
+    ctx,
+    parsed.data,
+  );
+  return { output: parsed.data, nodeIds, edgeIds };
+}

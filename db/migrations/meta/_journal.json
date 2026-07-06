@@ -22,6 +22,20 @@
       "when": 1783288526828,
       "tag": "0002_task_board_status",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1783335716342,
+      "tag": "0003_readonly_role",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1783335716808,
+      "tag": "0004_low_risk_edges_revocable",
+      "breakpoints": true
     }
   ]
 }

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { edges, auditLog } from "@/db/schema";
-import { createNode, createEdge, confirmEdge, getProvenance } from "@/lib/graph";
+import { createNode, createEdge, confirmEdge, revertEdge, getProvenance } from "@/lib/graph";
 import { resetGraph, pgErrorMessage, TEST_PROJECT as PROJECT } from "./test-helpers";
 
 /**
@@ -132,6 +132,66 @@ describe("图内核硬约束", () => {
       .execute(sql`UPDATE edges SET dst_id = ${a.id} WHERE id = ${edge.id}`)
       .catch((e) => e);
     expect(pgErrorMessage(updateErr)).toMatch(/immutable/);
+  });
+
+  it("③c 已确认的低风险边可以被撤销；已确认的高风险边不行——db/migrations/0004", async () => {
+    const a = await createNode({
+      type: "evidence",
+      projectId: PROJECT,
+      title: "证据 A",
+      createdBy: "human",
+      sourceRef: { kind: "human", detail: {} },
+    });
+    const b = await createNode({
+      type: "evidence",
+      projectId: PROJECT,
+      title: "证据 B",
+      createdBy: "human",
+      sourceRef: { kind: "human", detail: {} },
+    });
+    const c = await createNode({
+      type: "feature",
+      projectId: PROJECT,
+      title: "需求",
+      createdBy: "human",
+      sourceRef: { kind: "human", detail: {} },
+    });
+
+    // 低风险边：捕获自动生效的典型例子（决策 C）
+    const lowRiskEdge = await createEdge({
+      type: "duplicates",
+      srcId: a.id,
+      dstId: b.id,
+      projectId: PROJECT,
+      status: "confirmed",
+      createdBy: "capture",
+      sourceRef: { kind: "agent", detail: {} },
+    });
+    await revertEdge(lowRiskEdge.id, "human");
+    const remainingLowRisk = await db
+      .select()
+      .from(edges)
+      .where(sql`id = ${lowRiskEdge.id}`);
+    expect(remainingLowRisk).toHaveLength(0);
+
+    // 高风险边：即使确认了，仍然是信任账本，撤销必须被拒绝
+    const highRiskEdge = await createEdge({
+      type: "supports",
+      srcId: a.id,
+      dstId: c.id,
+      projectId: PROJECT,
+      createdBy: "human",
+      sourceRef: { kind: "human", detail: {} },
+    });
+    await confirmEdge(highRiskEdge.id, "human");
+    await expect(revertEdge(highRiskEdge.id, "human")).rejects.toThrow(
+      /信任账本/,
+    );
+    const remainingHighRisk = await db
+      .select()
+      .from(edges)
+      .where(sql`id = ${highRiskEdge.id}`);
+    expect(remainingHighRisk).toHaveLength(1);
   });
 
   it("④ 出处链完整可查：谁创建、基于什么、置信度", async () => {
