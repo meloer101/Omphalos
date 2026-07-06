@@ -69,14 +69,15 @@ export function CmdKSearch() {
         body: JSON.stringify({ question: q }),
       });
 
-      // no_record 是普通 JSON；answer 是"首行元数据 + 流式正文"。
+      // no_record / 错误都是普通 JSON；answer 才是"首行元数据 + 流式正文"。
       const contentType = res.headers.get("Content-Type") ?? "";
-      if (contentType.includes("application/json")) {
-        const data = await res.json();
-        setState(data?.kind === "no_record" ? { phase: "no_record" } : {
-          phase: "error",
-          message: data?.error ?? "检索失败",
-        });
+      if (!res.ok || contentType.includes("application/json")) {
+        const data = await res.json().catch(() => null);
+        setState(
+          data?.kind === "no_record"
+            ? { phase: "no_record" }
+            : { phase: "error", message: data?.error ?? "检索失败" },
+        );
         return;
       }
 

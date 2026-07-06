@@ -27,7 +27,19 @@ export async function POST(request: Request) {
     return Response.json({ error: "question is required" }, { status: 400 });
   }
 
-  const result = await answerQuestion(question, DEFAULT_PROJECT_ID);
+  let result;
+  try {
+    result = await answerQuestion(question, DEFAULT_PROJECT_ID);
+  } catch (err) {
+    // 检索前置步骤（问题向量化 / 图查询）失败——最常见是 embedding 模型
+    // 没配好或不可用。返回干净的错误 JSON，让 Cmd-K 面板显示"出错了"，
+    // 而不是让前端卡在"检索中…"（错误里不回传细节，避免泄露内部配置）。
+    console.error("[retrieval] answerQuestion 失败:", err);
+    return Response.json(
+      { kind: "error", error: "检索暂时不可用" },
+      { status: 500 },
+    );
+  }
 
   if (result.kind === "no_record") {
     return Response.json({ kind: "no_record", message: NO_RECORD_MESSAGE });
