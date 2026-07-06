@@ -6,6 +6,7 @@ import { SIDEBAR_OPEN_COOKIE } from "@/lib/config";
 import { SidebarContextPanel } from "./sidebar-context-panel";
 import { SidebarCapturePanel } from "./sidebar-capture-panel";
 import { SidebarLiveRefresh } from "./sidebar-live-refresh";
+import { CmdKSearch } from "./cmd-k-search";
 
 type Tab = "context" | "capture" | "review";
 
@@ -83,6 +84,12 @@ export function WorkbenchChrome({
         >
           审批
         </Link>
+        <Link
+          className="px-2 py-1.5 rounded text-sm hover:bg-black/5 dark:hover:bg-white/5"
+          href="/import"
+        >
+          导入
+        </Link>
         <button
           type="button"
           onClick={toggle}
@@ -120,6 +127,9 @@ export function WorkbenchChrome({
           </div>
         </aside>
       )}
+
+      {/* Cmd-K 追溯搜索栏——AI 露面，随侧边栏开关：关闭态不挂，保 G5 降级完整性。 */}
+      {open && <CmdKSearch />}
     </div>
   );
 }

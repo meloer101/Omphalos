@@ -12,6 +12,10 @@ import { getBoss, QUEUE } from "@/lib/queue/boss";
  * 调用（建节点、编辑正文），confirmNode 不改正文所以不重复向量化。
  */
 async function enqueueEmbed(nodeId: string): Promise<void> {
+  // 单测里不起 pg-boss：图内核的单元测试大量调 createNode，不该被拖去
+  // 连接/建库一个后台队列（会拖慢并留下未关闭句柄）。向量化管线由 live
+  // 集成测试（连真库 + 真 embedding 模型）单独覆盖，见 Phase2-开工计划.md 五。
+  if (process.env.VITEST) return;
   try {
     const boss = await getBoss();
     await boss.send(QUEUE.embed, { nodeId });
