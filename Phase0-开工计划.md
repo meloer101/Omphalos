@@ -176,12 +176,14 @@ omphalos/
    - `@ai-sdk/openai-compatible@3.0.5` 的 `.languageModel(id, config)` 第二个参数被静默忽略（`.d.ts` 比实际实现新）；`supportsStructuredOutputs` 只能在 `createOpenAICompatible()` 顶层设置，对该 provider 建出的所有模型全局生效。
 6. **另一个环境坑**：独立 tsx 脚本里 `import` 会被提升到所有代码之前执行——`config({path:'.env.local'})` 写在 import 语句之后并不能保证先跑。`lib/ai/client.ts` 已改成惰性构造（函数而非顶层 const）规避这个问题。
 
-### 0.5 出口验收（Day 10）
-- [ ] **纯手动完整链**：录 3 条证据 → 建 1 个需求（挂 supports 边）→ 拆 2 张任务卡（挂 implements 边）→ 录 1 条结果（挂 validates 边）
-- [ ] 任一节点修改即时反映到所有视图
-- [ ] AI 尚不存在，工作台全功能可用（降级态即出生态）
-- [ ] 全部验收测试绿，CI 绿
-- [ ] 打 tag `v0.1.0-phase0`
+### 0.5 出口验收（Day 10）—— ✅ 完成 2026-07-06
+- [x] **纯手动完整链**：3 条证据（已确认）→ 1 个需求"结算页支持微信支付"（3 条 supports 边）→ 2 张任务卡（2 条 implements 边）→ 1 条结果"支付转化率 +12%"（1 条 validates 边）——DB 直查 + 浏览器 `/inbox`、`/board`、`/node/[id]?tab=edges` 逐页截图核对，6 条边全部"已确认"、标题/类型/深链渲染无误
+- [x] 任一节点修改即时反映到所有视图（Server Component 直读 + `revalidatePath`，0.2 已验证机制成立）
+- [x] AI 尚不存在，工作台全功能可用（降级态即出生态）——右侧栏全程只是"Phase 1 实现"占位文案，三个视图和图内核完全不依赖任何 AI/LiteLLM 组件
+- [x] 全部验收测试绿（11/11，vitest）；CI 绿（GitHub Actions，Phase 0 四次提交全部 success）
+- [x] 打 tag `v0.1.0-phase0`
+
+**Phase 0 收尾总结**：地基（Next.js 16 + Drizzle + Supabase 本地 + AGPL）、图内核（4 节点/8 边 + 硬约束触发器）、三视图 CRUD、BlockNote 文档编辑器、LiteLLM/DeepSeek 连通性全部按计划完成，且比原定 10 天估算提前。过程中处理的非计划内但有价值的发现：三栏布局窄视口遮挡 bug（已修）、浏览器自动化点击与 React 19 Server Action 表单拦截的工具兼容性问题（未根治，改用等效验证路径）、vitest 并行测试文件共享 DB 的死锁问题（已修）、deepseek-v4-pro 结构化输出的正确策略（tool-calling + auto，已文档化进 Agent架构设计.md，直接影响 Phase 1 捕获 Agent 的实现方式）。
 
 ---
 
