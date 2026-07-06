@@ -11,6 +11,7 @@ import { NODE_TYPE_LABELS, EDGE_TYPE_LABELS } from "@/lib/labels";
 import { EDGE_TYPES } from "@/db/enums";
 import { NodePicker } from "@/components/node-picker";
 import { NodeBodyEditorLoader } from "@/components/node-body-editor-loader";
+import { PrototypePasteBox } from "@/components/prototype-paste-box";
 import type { Block } from "@blocknote/core";
 import {
   confirmThisNode,
@@ -21,10 +22,13 @@ import {
   connectEdge,
   confirmThisEdge,
   removeThisEdge,
+  addPrototypeFigmaLink,
+  removePrototype,
+  type PrototypeEntry,
 } from "./actions";
 
-type Tab = "body" | "edges" | "provenance";
-const TABS: { id: Tab; label: string }[] = [
+type Tab = "body" | "prototype" | "edges" | "provenance";
+const BASE_TABS: { id: Tab; label: string }[] = [
   { id: "body", label: "正文" },
   { id: "edges", label: "关联边" },
   { id: "provenance", label: "出处" },
@@ -44,14 +48,17 @@ export default async function NodePage({
 }) {
   const { id } = await params;
   const { tab: rawTab } = await searchParams;
-  const tab: Tab = (["body", "edges", "provenance"] as const).includes(
-    rawTab as Tab,
-  )
-    ? (rawTab as Tab)
-    : "body";
 
   const node = await getNode(id);
   if (!node) notFound();
+
+  // 「画布」（原型占位块）只对需求节点有意义（Phase1-开工计划.md 1.5）——
+  // 其他类型节点访问 ?tab=prototype 直接落回正文，不是报错。
+  const tabs: { id: Tab; label: string }[] =
+    node.type === "feature"
+      ? [BASE_TABS[0], { id: "prototype", label: "画布" }, ...BASE_TABS.slice(1)]
+      : BASE_TABS;
+  const tab: Tab = tabs.some((t) => t.id === rawTab) ? (rawTab as Tab) : "body";
 
   const [{ outgoing, incoming }, provenance, allNodes] = await Promise.all([
     getNodeNeighborhood(id),
@@ -99,7 +106,7 @@ export default async function NodePage({
       </div>
 
       <nav className="flex gap-1 mb-4 text-sm border-b border-black/10 dark:border-white/10">
-        {TABS.map((t) => (
+        {tabs.map((t) => (
           <Link
             key={t.id}
             href={`/node/${id}?tab=${t.id}`}
@@ -179,6 +186,94 @@ export default async function NodePage({
             />
           </div>
         ))}
+
+      {tab === "prototype" && (
+        <div className="flex flex-col gap-6">
+          <div>
+            <h2 className="text-sm font-medium mb-2">已有原型</h2>
+            {(() => {
+              const prototypes =
+                (node.body as { prototypes?: PrototypeEntry[] })?.prototypes ?? [];
+              if (prototypes.length === 0) {
+                return (
+                  <p className="text-sm text-black/40 dark:text-white/40">
+                    还没有原型引用——贴一张截图，或者加个 Figma 链接。
+                  </p>
+                );
+              }
+              return (
+                <ul className="flex flex-col gap-3">
+                  {prototypes.map((p) => (
+                    <li
+                      key={p.id}
+                      className="border border-black/10 dark:border-white/10 rounded p-2 flex flex-col gap-2"
+                    >
+                      {p.kind === "image" ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- data URL，不是外部资源，next/image 优化不适用
+                        <img
+                          src={p.value}
+                          alt="原型截图"
+                          className="max-w-full rounded"
+                        />
+                      ) : (
+                        <div className="flex flex-col gap-1">
+                          <iframe
+                            src={`https://www.figma.com/embed?embed_host=omphalos&url=${encodeURIComponent(p.value)}`}
+                            className="w-full rounded border border-black/10 dark:border-white/10"
+                            style={{ height: 360 }}
+                            allowFullScreen
+                          />
+                          <a
+                            href={p.value}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-xs underline text-black/50 dark:text-white/50"
+                          >
+                            在 Figma 中打开 ↗
+                          </a>
+                        </div>
+                      )}
+                      <form action={removePrototype.bind(null, node.id, p.id)}>
+                        <button
+                          type="submit"
+                          className="self-start text-xs px-2 py-0.5 rounded border border-black/20 dark:border-white/20 hover:bg-black/5 dark:hover:bg-white/5"
+                        >
+                          移除
+                        </button>
+                      </form>
+                    </li>
+                  ))}
+                </ul>
+              );
+            })()}
+          </div>
+
+          <div>
+            <h2 className="text-sm font-medium mb-2">添加 Figma 链接</h2>
+            <form
+              action={addPrototypeFigmaLink.bind(null, node.id)}
+              className="flex gap-2"
+            >
+              <input
+                name="figmaUrl"
+                placeholder="https://www.figma.com/..."
+                className="flex-1 border border-black/10 dark:border-white/10 rounded px-2 py-1.5 text-sm bg-transparent"
+              />
+              <button
+                type="submit"
+                className="px-3 py-1.5 text-sm rounded border border-black/20 dark:border-white/20 hover:bg-black/5 dark:hover:bg-white/5"
+              >
+                添加
+              </button>
+            </form>
+          </div>
+
+          <div>
+            <h2 className="text-sm font-medium mb-2">贴图</h2>
+            <PrototypePasteBox nodeId={node.id} />
+          </div>
+        </div>
+      )}
 
       {tab === "edges" && (
         <div className="flex flex-col gap-6">
