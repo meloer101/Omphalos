@@ -1,38 +1,35 @@
-import Link from "next/link";
+import { cookies } from "next/headers";
+import { listPendingReview } from "@/lib/graph";
+import { DEFAULT_PROJECT_ID, SIDEBAR_OPEN_COOKIE } from "@/lib/config";
+import { ReviewPanel } from "@/components/review-panel";
+import { WorkbenchChrome } from "@/components/workbench-chrome";
 
 /**
- * 三栏工作台外壳（PRD R2/R6）：左导航 / 中变形栏 / 右侧栏占位。
- * AI 侧边栏在 Phase 1 才实现交互；这里先占位以验证"关闭 AI 后
- * 工作台仍完整可用"这条降级原则从骨架阶段就成立。
+ * 三栏工作台外壳（PRD R2/R6）：左导航 / 中变形栏 / 右侧栏。1.4 把
+ * 侧边栏从占位文案换成真正的可开关框架（components/workbench-chrome.tsx）
+ * ——数据获取（读 cookie、查审批数据）留在这个 Server Component，交互
+ * 状态（开关、切 tab）交给下面的 Client Component，边界清楚。
+ *
+ * 用了 cookies() 之后这个布局包裹的所有页面都变成动态渲染——这是预期
+ * 且正确的：侧边栏的审批数据本来就该是每次请求的实时快照，不该是
+ * 构建时的静态快照。
  */
-export default function WorkbenchLayout({
+export default async function WorkbenchLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const cookieStore = await cookies();
+  const sidebarOpen = cookieStore.get(SIDEBAR_OPEN_COOKIE)?.value !== "0";
+
+  const review = await listPendingReview(DEFAULT_PROJECT_ID);
+
   return (
-    <div className="flex h-full min-h-screen">
-      <nav className="w-56 shrink-0 border-r border-black/10 dark:border-white/10 p-4 flex flex-col gap-1">
-        <div className="text-sm font-medium mb-3 px-2">Omphalos</div>
-        <Link
-          className="px-2 py-1.5 rounded text-sm hover:bg-black/5 dark:hover:bg-white/5"
-          href="/inbox"
-        >
-          反馈收件箱
-        </Link>
-        <Link
-          className="px-2 py-1.5 rounded text-sm hover:bg-black/5 dark:hover:bg-white/5"
-          href="/board"
-        >
-          看板
-        </Link>
-      </nav>
-
-      <main className="flex-1 min-w-0 overflow-auto">{children}</main>
-
-      <aside className="w-80 shrink-0 border-l border-black/10 dark:border-white/10 p-4 text-sm text-black/40 dark:text-white/40">
-        AI 侧边栏（Phase 1 实现）
-      </aside>
-    </div>
+    <WorkbenchChrome
+      defaultOpen={sidebarOpen}
+      reviewPanel={<ReviewPanel review={review} />}
+    >
+      {children}
+    </WorkbenchChrome>
   );
 }
