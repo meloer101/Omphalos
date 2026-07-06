@@ -41,7 +41,11 @@ export default async function InboxPage() {
         {sorted.map((node) => (
           <li
             key={node.id}
-            className="flex items-center justify-between gap-3 p-3 border border-black/10 dark:border-white/10 rounded"
+            className={`flex items-center justify-between gap-3 p-3 rounded border ${
+              node.status === "proposed"
+                ? "border-dashed border-black/25 dark:border-white/25"
+                : "border-black/10 dark:border-white/10"
+            }`}
           >
             <Link href={`/node/${node.id}`} className="min-w-0 flex-1">
               <div className="text-sm truncate">{node.title}</div>

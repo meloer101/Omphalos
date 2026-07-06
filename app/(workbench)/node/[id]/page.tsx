@@ -190,7 +190,11 @@ export default async function NodePage({
                 return (
                   <li
                     key={e.id}
-                    className="flex items-center justify-between gap-2 p-2 border border-black/10 dark:border-white/10 rounded text-sm"
+                    className={`flex items-center justify-between gap-2 p-2 rounded border text-sm ${
+                      e.status === "proposed"
+                        ? "border-dashed border-black/25 dark:border-white/25"
+                        : "border-black/10 dark:border-white/10"
+                    }`}
                   >
                     <span>
                       <span className="text-black/40 dark:text-white/40">
@@ -246,7 +250,11 @@ export default async function NodePage({
                 return (
                   <li
                     key={e.id}
-                    className="p-2 border border-black/10 dark:border-white/10 rounded text-sm"
+                    className={`p-2 rounded border text-sm ${
+                      e.status === "proposed"
+                        ? "border-dashed border-black/25 dark:border-white/25"
+                        : "border-black/10 dark:border-white/10"
+                    }`}
                   >
                     {source ? (
                       <Link href={`/node/${source.id}`} className="underline">

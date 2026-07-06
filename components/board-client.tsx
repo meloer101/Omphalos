@@ -33,7 +33,11 @@ function TaskCard({ task }: { task: Node }) {
           : undefined,
         opacity: isDragging ? 0.4 : 1,
       }}
-      className="p-2.5 border border-black/10 dark:border-white/10 rounded bg-white dark:bg-black cursor-grab active:cursor-grabbing"
+      className={`p-2.5 rounded border bg-white dark:bg-black cursor-grab active:cursor-grabbing ${
+        task.status === "proposed"
+          ? "border-dashed border-black/25 dark:border-white/25"
+          : "border-black/10 dark:border-white/10"
+      }`}
     >
       <Link
         href={`/node/${task.id}`}
