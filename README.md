@@ -27,10 +27,18 @@
 
 ```bash
 pnpm install
-cp .env.example .env.local   # 按本地 supabase status 填 DATABASE_URL
+cp .env.example .env.local   # 按本地 supabase status 填 DATABASE_URL，另填 DEEPSEEK_API_KEY
 pnpm supabase:start          # 起本地 Postgres+pgvector（首次会拉取镜像，较慢）
 pnpm db:migrate              # 应用迁移（含图内核的硬约束触发器）
 pnpm dev
+```
+
+Agent 相关开发还需要 LiteLLM 代理（把 DeepSeek 包成 OpenAI 兼容端点）：
+
+```bash
+cp litellm/.env.example litellm/.env   # 填 DEEPSEEK_API_KEY
+pnpm litellm:start                     # 起 LiteLLM（http://127.0.0.1:4000）
+pnpm litellm:stop
 ```
 
 常用命令：`pnpm test`（vitest）、`pnpm typecheck`、`pnpm lint`、`pnpm db:studio`（Drizzle Studio 查图）。

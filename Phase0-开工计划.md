@@ -155,12 +155,26 @@ omphalos/
   - 落地：`components/node-body-editor.tsx` + `-loader.tsx`，接入 `/node/[id]` 正文 tab（evidence/feature/task 类型），`body` 存 `{ blocks: BlockNote.Block[] }`；outcome 类型仍用专属指标表单，不受影响
 - [x] 已移除未选中的 TipTap 依赖（`@tiptap/react`/`@tiptap/pm`/`@tiptap/starter-kit`）及全部 spike 路由
 
-### 0.4 模型链路连通性 spike（Day 9，风险前置）
+### 0.4 模型链路连通性 spike（Day 9，风险前置）—— ✅ 完成 2026-07-05／06
 > 不写业务 Agent，只验证"AI SDK → LiteLLM → DeepSeek 结构化输出"这条命脉稳不稳。
-- [ ] 自部署 LiteLLM proxy（Docker），配 DeepSeek，暴露 OpenAI 兼容端点
-- [ ] AI SDK `createOpenAICompatible` 指向 LiteLLM，跑通 `generateObject`
-- [ ] **压测**：给一个"从 5 条反馈抽取结构化证据节点"的 zod schema，跑 20 次，测 DeepSeek 结构化输出的成功率/稳定性
-- [ ] 结论写入风险登记：达标则 P1 捕获 Agent 按此搭；不达标则评估换模型（LiteLLM 换一行）或加 schema 修复层
+- [x] 自部署 LiteLLM proxy（`docker-compose.litellm.yml`），配 `deepseek-v4-pro`，暴露 OpenAI 兼容端点
+- [x] AI SDK `createOpenAICompatible` 指向 LiteLLM，跑通结构化输出
+- [x] **压测**：`lib/ai/spike-stress-test.ts`，从 5 条混合反馈抽取结构化证据条目，跑 20 次
+- [x] 结论写入风险登记（见下）：**达标，100% 成功率**，P1 捕获 Agent 可按此链路搭建
+
+**压测结果：成功率 100.0%（20/20），平均延迟 10805ms/次。**
+
+**关键发现（决定 P1 捕获 Agent 怎么写，比压测数字本身更重要）：**
+
+1. **`deepseek-v4-pro` 拒绝 `response_format: json_schema`**——报错"This response_format type is unavailable now"。`generateObject`/`Output.object()` 这条路走不通（除非退化成不带 schema 的裸 `json_object`，那样模型会自己瞎编 JSON 形状，完全不认我们传的 zod schema）。
+2. **`deepseek-v4-pro` 是"思考模式"（reasoning）模型，拒绝强制 `tool_choice`**（指定具体工具、或 `'required'`）——报错"Thinking mode does not support this tool_choice"。
+3. **唯一稳定跑通的策略：tool-calling + `toolChoice: 'auto'` + prompt 里明确要求调用工具。** 100% 成功率验证。**P1 捕获 Agent 必须照此模式搭建**，不要指望 response_format 或强制 tool_choice——这两条路在这个模型上都是死路。
+4. **延迟较高（平均 10.8 秒/次，最高 18 秒）**，符合"思考模式"模型的预期（推理耗 token）。**UX 含义**：捕获 Agent 面向用户的交互必须设计成异步/后台处理，不能是阻塞式同步等待。
+5. **两个 LiteLLM/docker 配置坑**（记录避免以后重踩）：
+   - docker compose 的 `environment: ${VAR}` 替换是 compose CLI 自己的机制，只认同目录字面量 `.env` 文件，不认 `env_file:`；写错会静默替换成空字符串，还会覆盖 `env_file` 已经正确注入的值。
+   - 不能把整个 `.env.local` 通过 `env_file` 塞给 litellm 容器——里面的 `DATABASE_URL` 会被 LiteLLM 自动识别当成它自己的后端 Postgres 去连，容器内 `127.0.0.1:54322` 连不到宿主机的 Supabase。已改用专门的 `litellm/.env`（只放 `DEEPSEEK_API_KEY`/`LITELLM_API_KEY`，已 gitignore）。
+   - `@ai-sdk/openai-compatible@3.0.5` 的 `.languageModel(id, config)` 第二个参数被静默忽略（`.d.ts` 比实际实现新）；`supportsStructuredOutputs` 只能在 `createOpenAICompatible()` 顶层设置，对该 provider 建出的所有模型全局生效。
+6. **另一个环境坑**：独立 tsx 脚本里 `import` 会被提升到所有代码之前执行——`config({path:'.env.local'})` 写在 import 语句之后并不能保证先跑。`lib/ai/client.ts` 已改成惰性构造（函数而非顶层 const）规避这个问题。
 
 ### 0.5 出口验收（Day 10）
 - [ ] **纯手动完整链**：录 3 条证据 → 建 1 个需求（挂 supports 边）→ 拆 2 张任务卡（挂 implements 边）→ 录 1 条结果（挂 validates 边）

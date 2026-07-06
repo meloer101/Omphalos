@@ -1,0 +1,16 @@
+# 独立于 Supabase CLI 管理的 docker（那个由 `supabase start` 自己起）。
+# 起停：docker compose -f docker-compose.litellm.yml up -d / down
+services:
+  litellm:
+    image: ghcr.io/berriai/litellm:main-stable
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./litellm/config.yaml:/app/config.yaml
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    # 专门给 litellm 用的最小 env 文件（litellm/.env，已 gitignore）——
+    # 不能直接指向根目录 .env.local：那里的 DATABASE_URL 会被 LiteLLM
+    # 自动识别并当成它自己的后端 Postgres 去连，容器内 127.0.0.1:54322
+    # 连不到宿主机的 Supabase，会一直报 P1001 连接失败。
+    env_file:
+      - litellm/.env

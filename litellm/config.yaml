@@ -1,0 +1,10 @@
+# LiteLLM proxy 配置（Agent架构设计.md 5.3）：代理层负责"接哪家模型"，
+# 应用代码永远只认 OpenAI 兼容协议——换模型改这个文件，不改一行 TS。
+model_list:
+  - model_name: default
+    litellm_params:
+      model: deepseek/deepseek-v4-pro
+      api_key: os.environ/DEEPSEEK_API_KEY
+
+general_settings:
+  master_key: os.environ/LITELLM_API_KEY

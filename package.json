@@ -13,7 +13,9 @@
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "supabase:start": "supabase start",
-    "supabase:stop": "supabase stop"
+    "supabase:stop": "supabase stop",
+    "litellm:start": "docker compose -f docker-compose.litellm.yml up -d",
+    "litellm:stop": "docker compose -f docker-compose.litellm.yml down"
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "^3.0.5",

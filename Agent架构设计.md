@@ -160,9 +160,10 @@
 
 ### 5.3 框架选型：不用 LangChain
 - 理由：我们的 Agent 是窄而结构化的工作流，"下一步做什么"由事件驱动编排层的确定性代码决定，不是 LLM 自主循环——重框架的核心价值用不上，抽象税照付。
-- **采用：Vercel AI SDK**（TS 原生契合；`generateObject` 直出 zod 校验的结构化输出；provider 字符串换模型，含本地模型选项以满足 OQ3 采购门槛；流式内建。是库不是框架，不接管架构）。
+- **采用：Vercel AI SDK**（TS 原生契合；zod 校验的结构化输出；provider 字符串换模型，含本地模型选项以满足 OQ3 采购门槛；流式内建。是库不是框架，不接管架构）。
 - **编排层自建且薄**：Postgres LISTEN/NOTIFY 出事件 + pg-boss（Postgres 上的任务队列，仍是单库）+ 数百行编排代码。
 - 运行时全家当：AI SDK + zod + pg-boss + 自写编排。
+- **结构化输出的具体策略（Phase0-开工计划.md 0.4 spike 验证，2026-07-06）**：不用 `generateObject`/`Output.object()` 的 response_format 路径——当前接入的 `deepseek-v4-pro` 是思考模式模型，拒绝 `json_schema` 类型的 response_format，也拒绝强制 `tool_choice`。**唯一验证稳定（20/20）的模式：`generateText` + `tools` + `toolChoice: 'auto'` + prompt 里明确要求调用工具，从 tool call 的 input 里取结构化结果。** 捕获 Agent 的五段流水线里"LLM 调用"那一步要按这个模式实现，不是裸的 schema-in-response-format。延迟较高（均值 ~11s，因为是思考模型），捕获交互必须设计成异步，不能阻塞式同步等待。
 
 ### 5.4 MCP / Skills / Subagent 的位置
 - **MCP as server（P1-P2 亮点）**：把图暴露为 MCP server，用户在 Cursor/Claude Code 里直查自己产品的图（"这个函数对应的需求当初为什么做？"）——开源+开发者团队定位的传播卖点。
