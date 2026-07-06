@@ -10,7 +10,7 @@ model_list:
   # streamText 流式吐字，不用捕获那个 ~11s 的思考模型。换供应商只改这里。
   - model_name: fast
     litellm_params:
-      model: deepseek/deepseek-v4
+      model: deepseek/deepseek-v4-flash
       api_key: os.environ/DEEPSEEK_API_KEY
 
   # 语义索引用的 embedding 模型（Phase2-开工计划.md 决策 E）：OpenAI 兼容
