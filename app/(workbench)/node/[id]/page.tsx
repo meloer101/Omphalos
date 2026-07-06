@@ -10,10 +10,13 @@ import { DEFAULT_PROJECT_ID } from "@/lib/config";
 import { NODE_TYPE_LABELS, EDGE_TYPE_LABELS } from "@/lib/labels";
 import { EDGE_TYPES } from "@/db/enums";
 import { NodePicker } from "@/components/node-picker";
+import { NodeBodyEditorLoader } from "@/components/node-body-editor-loader";
+import type { Block } from "@blocknote/core";
 import {
   confirmThisNode,
   deleteThisNode,
-  updateNodeBody,
+  updateNodeTitle,
+  saveNodeBody,
   updateOutcomeBody,
   connectEdge,
   confirmThisEdge,
@@ -152,30 +155,29 @@ export default async function NodePage({
             </button>
           </form>
         ) : (
-          <form
-            action={updateNodeBody.bind(null, node.id)}
-            className="flex flex-col gap-2"
-          >
-            <input
-              name="title"
-              defaultValue={node.title}
-              required
-              className="border border-black/10 dark:border-white/10 rounded px-2 py-1.5 text-sm bg-transparent font-medium"
-            />
-            <textarea
-              name="body"
-              rows={8}
-              defaultValue={(node.body as { text?: string })?.text ?? ""}
-              placeholder="正文（Phase 0 纯文本，富文本编辑器见 0.3 spike）"
-              className="border border-black/10 dark:border-white/10 rounded px-2 py-1.5 text-sm bg-transparent"
-            />
-            <button
-              type="submit"
-              className="self-start px-3 py-1.5 text-sm rounded border border-black/20 dark:border-white/20 hover:bg-black/5 dark:hover:bg-white/5"
+          <div className="flex flex-col gap-3">
+            <form
+              action={updateNodeTitle.bind(null, node.id)}
+              className="flex gap-2"
             >
-              保存
-            </button>
-          </form>
+              <input
+                name="title"
+                defaultValue={node.title}
+                required
+                className="flex-1 border border-black/10 dark:border-white/10 rounded px-2 py-1.5 text-sm bg-transparent font-medium"
+              />
+              <button
+                type="submit"
+                className="px-3 py-1.5 text-sm rounded border border-black/20 dark:border-white/20 hover:bg-black/5 dark:hover:bg-white/5"
+              >
+                改标题
+              </button>
+            </form>
+            <NodeBodyEditorLoader
+              initialBlocks={(node.body as { blocks?: Block[] })?.blocks ?? null}
+              onSave={saveNodeBody.bind(null, node.id)}
+            />
+          </div>
         ))}
 
       {tab === "edges" && (

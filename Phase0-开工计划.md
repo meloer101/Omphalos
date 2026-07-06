@@ -145,9 +145,15 @@ omphalos/
 **验证方式的调整（重要）**：浏览器自动化点击在这次的 preview 环境里遇到工具本身的限制——点击/`.click()`/`requestSubmit()` 均确认事件到达 DOM，但未能触发 React 19 对 `<form action={serverAction}>` 的拦截（先后排除了两个假说：viewport 过窄导致 `<aside>` 遮挡按钮的真实布局 bug，已修复；以及 stale HMR 的 action 引用，重启+清缓存后依旧复现）。用 curl 直接构造 Next.js 的 no-JS 渐进增强表单编码（`$ACTION_ID_xxx` + multipart/form-data）验证了 `createEvidence` 端到端可用（写库+重渲染），证明底层机制正确；随后补充 `db/__tests__/node-crud.test.ts`（5 个用例，覆盖 `getNode`/`updateNode`/`confirmNode`/`deleteNode`/`listAllNodes`）作为新函数的主要验证手段，全部通过。最后用脚本直接调用 `lib/graph` 跑通完整出口验收链（3 证据→1 需求 supports→2 任务 implements→1 结果 validates），并在浏览器中逐页 `preview_snapshot` 视觉确认渲染正确（收件箱/看板/需求详情/结果指标表单/出处 tab 全部截图核对）。
 - **副产品修复**：`vitest.config.ts` 加 `fileParallelism: false`——两个测试文件共享同一本地 Postgres 并用 TRUNCATE 重置状态，并行跑文件会互相冲突甚至死锁，这个坑不修会在 CI 里更隐蔽地复现。
 
-### 0.3 文档编辑器 spike（Day 5，与 0.2 并行）
-- [ ] TipTap 与 BlockNote 各接一个最小 demo，存 JSONB、读回渲染
-- [ ] 定选型（D2），文档页（需求节点正文）用选中者落地
+### 0.3 文档编辑器 spike（Day 5，与 0.2 并行）—— ✅ 完成 2026-07-05
+- [x] TipTap 与 BlockNote 各接一个最小 demo，存 JSONB、读回渲染——两者 JSONB 往返均无损（vitest 之外用 preview 逐项核对：标题/列表/加粗/斜体全部保留）
+- [x] **定选型（D2）：BlockNote。** 理由：
+  - 两者都通过硬指标（JSONB 无损往返），非阻塞项
+  - BlockNote 开箱即带 Notion 式 slash 命令/拖拽手柄/格式工具栏，命中产品定位里"很像 Notion 的 block 编辑体验"；TipTap 更灵活但需要自建这套 UI chrome
+  - BlockNote 底层就是 TipTap/ProseMirror（`@tiptap/core` 是其依赖），选 BlockNote 不等于放弃 TipTap 生态的可扩展性（自定义 inline content 仍可做 @节点提及）
+  - 代价：JSON 结构更冗长（每个 block 带 id/props，即使默认值）——Phase 0 规模下不是问题；且 BlockNote 构造时访问 `window`，SSR 场景必须走 `next/dynamic(ssr:false)`（已建 `components/node-body-editor-loader.tsx` 封装，一次性成本）
+  - 落地：`components/node-body-editor.tsx` + `-loader.tsx`，接入 `/node/[id]` 正文 tab（evidence/feature/task 类型），`body` 存 `{ blocks: BlockNote.Block[] }`；outcome 类型仍用专属指标表单，不受影响
+- [x] 已移除未选中的 TipTap 依赖（`@tiptap/react`/`@tiptap/pm`/`@tiptap/starter-kit`）及全部 spike 路由
 
 ### 0.4 模型链路连通性 spike（Day 9，风险前置）
 > 不写业务 Agent，只验证"AI SDK → LiteLLM → DeepSeek 结构化输出"这条命脉稳不稳。

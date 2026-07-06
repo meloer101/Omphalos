@@ -34,11 +34,20 @@ export async function deleteThisNode(nodeId: string, nodeType: NodeType) {
   redirect(nodeType === "task" ? "/board" : "/inbox");
 }
 
-export async function updateNodeBody(nodeId: string, formData: FormData) {
+export async function updateNodeTitle(nodeId: string, formData: FormData) {
   const title = String(formData.get("title") ?? "").trim();
-  const text = String(formData.get("body") ?? "").trim();
   if (!title) return;
-  await updateNode(nodeId, { title, body: { text } });
+  await updateNode(nodeId, { title });
+  revalidateNode(nodeId);
+}
+
+/**
+ * BlockNote 正文保存——programmatic 调用（不走 <form>，富文本编辑器
+ * 本来就依赖 JS，没有渐进增强的必要）。D2 spike 结论见
+ * Phase0-开工计划.md：body 存 `{ blocks: BlockNote.Block[] }`。
+ */
+export async function saveNodeBody(nodeId: string, blocks: unknown) {
+  await updateNode(nodeId, { body: { blocks } });
   revalidateNode(nodeId);
 }
 
