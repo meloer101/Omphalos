@@ -1,4 +1,5 @@
 import { generateText, tool } from "ai";
+import { jsonrepair } from "jsonrepair";
 import { getDefaultModel } from "@/lib/ai/client";
 import type { AgentContract } from "./contract";
 
@@ -63,7 +64,15 @@ export async function runPipeline<TInput, TOutput>(
     );
   }
 
-  const parsed = contract.outputSchema.safeParse(call.input);
+  // call.input 正常应已是解析好的对象；但当模型吐出的 JSON 语法有误时
+  // （最常见：字符串字段里出现未转义的引号——中文反馈原文自带引号是家常
+  // 便饭），`ai` 包内置的 JSON.parse 会失败并把原始字符串原样透传出来，
+  // 此时 call.input 的类型是 string 而非 object。用 jsonrepair 兜底修复
+  // 这类语法错误后再走一次 zod 校验，救回原本会整批失败的捕获结果。
+  const rawInput =
+    typeof call.input === "string" ? tryRepairJson(call.input) : call.input;
+
+  const parsed = contract.outputSchema.safeParse(rawInput);
   if (!parsed.success) {
     throw new PipelineOutputError(contract.name, parsed.error);
   }
@@ -74,4 +83,13 @@ export async function runPipeline<TInput, TOutput>(
     parsed.data,
   );
   return { output: parsed.data, nodeIds, edgeIds };
+}
+
+/** 语法有误就试着修，修不好原样返回（后面 zod 校验会给出清楚的错误）。 */
+export function tryRepairJson(raw: string): unknown {
+  try {
+    return JSON.parse(jsonrepair(raw));
+  } catch {
+    return raw;
+  }
 }
