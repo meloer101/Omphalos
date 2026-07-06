@@ -9,6 +9,7 @@ import {
   captureContract,
   type CaptureInput,
 } from "@/lib/agents/contracts/capture";
+import { embedNode } from "@/lib/embed";
 
 /**
  * Worker 入口（Phase1-开工计划.md 1.0）：独立 node 进程，`pnpm worker`
@@ -35,7 +36,15 @@ async function main() {
     }
   });
 
-  console.log("worker 已启动，监听 capture 队列...");
+  // 语义索引 job（Phase2-开工计划.md 2.1）：节点正文写入后由 lib/graph
+  // 入队，这里异步算向量写回 nodes.embedding。失败由队列 retryLimit 兜底。
+  await boss.work<{ nodeId: string }>(QUEUE.embed, async (jobs) => {
+    for (const job of jobs) {
+      await embedNode(job.data.nodeId);
+    }
+  });
+
+  console.log("worker 已启动，监听 capture / embed / import 队列...");
 
   const shutdown = async () => {
     console.log("worker 关闭中...");

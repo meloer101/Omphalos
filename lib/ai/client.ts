@@ -30,3 +30,22 @@ function getLitellmProvider() {
 export function getDefaultModel() {
   return getLitellmProvider()("default");
 }
+
+/**
+ * 检索生成用的"快模型"（Phase2-开工计划.md 决策 F）。捕获用的思考模型
+ * 延迟 ~11s，交互式 Cmd-K 追溯不能等；架构 5.2"按角色配模型"允许分离。
+ * 换供应商只改 litellm/config.yaml 的 `fast` 别名。
+ */
+export function getFastModel() {
+  return getLitellmProvider()("fast");
+}
+
+/**
+ * 语义索引用的 embedding 模型（Phase2-开工计划.md 决策 E）。走 OpenAI
+ * 兼容 1536 维，正好匹配 db/schema.ts 的 `nodes.embedding vector(1536)`，
+ * 零 schema 改动。换供应商/换本地模型只改 litellm/config.yaml 的
+ * `embedding` 别名——注意换维度需同步改 schema 与向量索引迁移。
+ */
+export function getEmbeddingModel() {
+  return getLitellmProvider().textEmbeddingModel("embedding");
+}
