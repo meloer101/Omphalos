@@ -23,5 +23,12 @@ model_list:
       model: ollama/bge-m3
       api_base: http://host.docker.internal:11434
 
+litellm_settings:
+  # AI SDK 的 embed() 会带上 OpenAI 标准的 encoding_format:'float'，但 Ollama
+  # 的 embedding 端点不认这个参数、会直接报 UnsupportedParamsError。开这个
+  # 开关让 LiteLLM 把下游不支持的参数丢掉再转发，而不是报错——应用层不必
+  # 为"某个 provider 不支持某参数"写特判，正是代理层该吸收的差异。
+  drop_params: true
+
 general_settings:
   master_key: os.environ/LITELLM_API_KEY
