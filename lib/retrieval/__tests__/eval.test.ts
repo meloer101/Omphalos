@@ -1,8 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import {
   EVAL_QUESTIONS,
   SEED_NODES,
   SEED_EDGES,
+  seedEvalGraph,
 } from "./eval.fixtures";
 import { assignHandles, parseCitedAnswer } from "../cite";
 import type { ReachableNode } from "../traverse";
@@ -78,14 +79,77 @@ describe("引用护栏跑遍评估集：合法引用留、幻觉引用剥离（0
 
 /**
  * live 端到端层：默认跳过，本地/nightly 起真库 + 真模型时打开
- * （RUN_RETRIEVAL_EVAL=1），验证真实回答的引用全部落在种子节点内、
- * 应拒答用例返回 no_record。放这里占位，实现随 2.3 出口验收补齐。
+ * （`RUN_RETRIEVAL_EVAL=1 pnpm vitest run lib/retrieval/__tests__/eval`）。
+ * 前置：Supabase 起着、LiteLLM 的 embedding（本地 bge-m3）+ fast 模型可用。
+ *
+ * 断言分两层：
+ *  - 硬不变量（所有用例）：回答里出现的每一个引用都必须落在种子节点内——
+ *    错误引用 0 容忍。护栏在 cite.ts 已结构性保证，这里在真实模型输出上
+ *    再验一遍，作为发版前的活体体检（Roadmap 风险登记：检索幻觉→停发版）。
+ *  - answer 用例：不该误拒（返回 answer 且至少引用到一个期望节点）。
+ *  - refuse 用例：不该硬凑（no_record，或答案里零引用/明说"图里没有记录"）。
+ *
+ * 会重置并占用 dev 库（同 db/__tests__ 惯例）。逐题一个真实模型往返，故给
+ * 足超时。
  */
-describe.skipIf(!process.env.RUN_RETRIEVAL_EVAL)(
-  "live 端到端（需真库 + 真模型）",
-  () => {
-    it("待实现：seedEvalGraph → embedNodes → answerQuestion 逐题断言", () => {
-      expect(true).toBe(true);
-    });
-  },
-);
+const RUN_LIVE = !!process.env.RUN_RETRIEVAL_EVAL;
+
+describe.skipIf(!RUN_LIVE)("live 端到端（需真库 + 真模型）", () => {
+  const PROJECT = "00000000-0000-0000-0000-000000000001";
+  let seedHandleToId: Map<string, string>;
+  let seededIds: Set<string>;
+
+  beforeAll(async () => {
+    // 动态 import：这些模块碰真库/真模型，只在 live 层加载，别拖累 CI 常跑层。
+    const { resetGraph } = await import("@/db/__tests__/test-helpers");
+    const { embedNodes } = await import("@/lib/embed");
+    await resetGraph();
+    seedHandleToId = await seedEvalGraph(PROJECT);
+    seededIds = new Set(seedHandleToId.values());
+    await embedNodes([...seededIds]); // 种子节点得有向量才被 semanticSearch 找到
+  }, 120_000);
+
+  afterAll(async () => {
+    const { resetGraph } = await import("@/db/__tests__/test-helpers");
+    await resetGraph();
+  });
+
+  it.each(EVAL_QUESTIONS.map((q) => [q.q, q] as const))(
+    "「%s」",
+    async (_label, question) => {
+      const { answerQuestion } = await import("../answer");
+      const result = await answerQuestion(question.q, PROJECT);
+
+      if (result.kind === "no_record") {
+        // 拒答是所有 refuse 用例的理想结局；answer 用例走到这里就是误拒。
+        expect(question.mode, `answer 用例被误拒: ${question.q}`).toBe("refuse");
+        return;
+      }
+
+      let raw = "";
+      for await (const delta of result.textStream) raw += delta;
+      const map = new Map(result.sources.map((s) => [s.handle, s]));
+      const { citations } = parseCitedAnswer(raw, map);
+
+      // 硬不变量：0 错误引用——每个引用都指向种子里的真实节点。
+      for (const c of citations) {
+        expect(seededIds.has(c.id), `越界引用 ${c.id}（${question.q}）`).toBe(true);
+      }
+
+      if (question.mode === "answer") {
+        const expectedIds = new Set(
+          (question.expectAnyOf ?? []).map((h) => seedHandleToId.get(h)),
+        );
+        expect(
+          citations.some((c) => expectedIds.has(c.id)),
+          `没引用到期望节点: ${question.q}`,
+        ).toBe(true);
+      } else {
+        // refuse 用例即便走了生成，也不该编造事实引用——零引用或明说没记录。
+        const refused = citations.length === 0 || raw.includes("图里没有记录");
+        expect(refused, `refuse 用例硬凑了带引用的回答: ${question.q}`).toBe(true);
+      }
+    },
+    60_000,
+  );
+});

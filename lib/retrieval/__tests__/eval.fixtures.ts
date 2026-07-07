@@ -1,4 +1,5 @@
 import type { NodeType, EdgeType } from "@/db/enums";
+import { createNode, createEdge } from "@/lib/graph";
 
 /**
  * 检索评估集 v1（Phase2-开工计划.md 2.2，PRD R4 验收）。一张确定性种子图
@@ -107,3 +108,39 @@ export const EVAL_QUESTIONS: EvalQuestion[] = [
   { q: "首页加载慢的问题解决了吗？", mode: "refuse" },
   { q: "移动端适配做到什么程度了？", mode: "refuse" },
 ];
+
+/**
+ * 把种子图熔进真库（供 live 端到端评估层用，eval.test.ts 的 gated describe）。
+ * 全部落 confirmed——检索只认已确认内容。返回 seed handle → 真实节点 id 的
+ * 映射，供断言把 expectAnyOf 对到真实引用。调用方负责先 resetGraph、再
+ * embedNodes（种子节点得有向量才被 semanticSearch 找到）。
+ */
+export async function seedEvalGraph(
+  projectId: string,
+): Promise<Map<string, string>> {
+  const handleToId = new Map<string, string>();
+  for (const spec of SEED_NODES) {
+    const node = await createNode({
+      type: spec.type,
+      projectId,
+      title: spec.title,
+      body: { text: spec.bodyText },
+      status: "confirmed",
+      createdBy: "human",
+      sourceRef: { kind: "human", detail: { eval: true } },
+    });
+    handleToId.set(spec.handle, node.id);
+  }
+  for (const e of SEED_EDGES) {
+    await createEdge({
+      type: e.type,
+      srcId: handleToId.get(e.src)!,
+      dstId: handleToId.get(e.dst)!,
+      projectId,
+      status: "confirmed",
+      createdBy: "human",
+      sourceRef: { kind: "human", detail: { eval: true } },
+    });
+  }
+  return handleToId;
+}

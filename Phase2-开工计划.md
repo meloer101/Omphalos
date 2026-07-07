@@ -103,7 +103,12 @@
 - 多项目/鉴权重构——仍用 `DEFAULT_PROJECT_ID`；升级式检索的"全局"先指全部 project scope。
 - 把 P1 侧边栏"上下文"面板改写成自然语句风格——Roadmap 2.2 备忘：Cmd-K 做完后整体感受一遍再决定，留到出口验收后回看。
 
-## 六、待补（不阻塞子阶段，出口验收前收口）
+## 六、收口记录（出口验收前的两个尾巴，均已关闭 2026-07-07）
 
-- live 端到端评估层实现（`eval.test.ts` 的 gated describe）：seedEvalGraph → embedNodes → answerQuestion 逐题断言引用 ⊆ 种子、应拒答返回 no_record。
-- 真实 Notion 导出包跑一遍 5 步 demo，补记踩坑。
+- ✅ **真实 Notion 导出包端到端**：造了一个含 2 个 `.md` 页面 + 1 个 `.csv` 数据库、按 Notion 命名规范（`标题 <32hex>.md`）的导出 zip → `/api/import` 正确拆成 **3 份文档** → DeepSeek 熔成 15 节点 + 10 边（CSV 行也变成 feature 节点）→ 15/15 自动向量化 → 审批整批确认 → ⌘K 问"为什么这期暂不覆盖评论内容"得到带行内深链的答案、0 错误引用。冷启动导入的 zip 解析路径至此实跑闭环。
+- ✅ **live 端到端评估层**（`eval.test.ts` 的 gated describe，`RUN_RETRIEVAL_EVAL=1`）：`seedEvalGraph → embedNodes → answerQuestion` 逐题断言。对真库 + 真模型（bge-m3 + DeepSeek）跑 **25/25 通过**（64s）：15 个 answer 用例均命中期望节点、0 错误引用；6 个 refuse 用例均正确拒答。硬不变量"错误引用 0 容忍"在真实模型输出上再验一遍。
+
+## 七、顺延项（明确挪到 P3/P4）
+
+- 串联 demo 的"原型占位"面（feature 画布 tab）未纳入本次 demo 数据——dogfooding 时数据自然会有，P3 补。
+- dev 库与 vitest 测试库同一个（`pnpm test` 会 TRUNCATE 掉演示图）——papercut，非 P2 范围，需要时再拆库。
