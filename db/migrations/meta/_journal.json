@@ -36,6 +36,20 @@
       "when": 1783335716808,
       "tag": "0004_low_risk_edges_revocable",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1783335717000,
+      "tag": "0005_embedding_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1783359800000,
+      "tag": "0006_embedding_dim_1024",
+      "breakpoints": true
     }
   ]
 }

@@ -3,6 +3,26 @@ import { db } from "@/db/client";
 import { nodes, edges, provenance, auditLog } from "@/db/schema";
 import { edgeRiskOf, type BoardStatus, type EdgeType, type NodeType } from "@/db/enums";
 import type { Node, Edge, Provenance } from "@/db/schema";
+import { getBoss, QUEUE } from "@/lib/queue/boss";
+
+/**
+ * 节点正文变化后，异步补一份向量（Phase2-开工计划.md 2.1）。故意做成
+ * "尽力而为、失败不影响写入"：向量只是检索索引，队列暂时不可用时不能
+ * 连累图写入本身——下次编辑正文会再次入队补上。只在正文可能变化的地方
+ * 调用（建节点、编辑正文），confirmNode 不改正文所以不重复向量化。
+ */
+async function enqueueEmbed(nodeId: string): Promise<void> {
+  // 单测里不起 pg-boss：图内核的单元测试大量调 createNode，不该被拖去
+  // 连接/建库一个后台队列（会拖慢并留下未关闭句柄）。向量化管线由 live
+  // 集成测试（连真库 + 真 embedding 模型）单独覆盖，见 Phase2-开工计划.md 五。
+  if (process.env.VITEST) return;
+  try {
+    const boss = await getBoss();
+    await boss.send(QUEUE.embed, { nodeId });
+  } catch (err) {
+    console.error(`[embed] 入队失败（不影响写入）node ${nodeId}:`, err);
+  }
+}
 
 /**
  * 新提议落库后通知审批 tab 实时刷新（Phase1-开工计划.md 1.0，架构 5.3）。
@@ -43,8 +63,8 @@ export interface CreateNodeInput {
 
 /** 建节点，永远同时写一条出处记录（人工创建 confidence 为 null）。 */
 export async function createNode(input: CreateNodeInput): Promise<Node> {
-  return db.transaction(async (tx) => {
-    const [node] = await tx
+  const node = await db.transaction(async (tx) => {
+    const [row] = await tx
       .insert(nodes)
       .values({
         type: input.type,
@@ -56,7 +76,7 @@ export async function createNode(input: CreateNodeInput): Promise<Node> {
       .returning();
 
     await tx.insert(provenance).values({
-      nodeId: node.id,
+      nodeId: row.id,
       sourceRef: input.sourceRef,
       createdBy: input.createdBy,
       confidence: input.confidence ?? null,
@@ -64,22 +84,29 @@ export async function createNode(input: CreateNodeInput): Promise<Node> {
 
     await tx.insert(auditLog).values({
       targetType: "node",
-      targetId: node.id,
-      action: node.status === "confirmed" ? "confirmed" : "proposed",
+      targetId: row.id,
+      action: row.status === "confirmed" ? "confirmed" : "proposed",
       actor: input.createdBy,
     });
 
-    if (node.status === "proposed") {
+    if (row.status === "proposed") {
       await notifyGraphChange(tx, {
         kind: "node",
-        id: node.id,
-        type: node.type,
-        projectId: node.projectId,
+        id: row.id,
+        type: row.type,
+        projectId: row.projectId,
       });
     }
 
-    return node;
+    return row;
   });
+
+  // 提交成功后再补索引（send 不进业务事务：即便回滚，孤儿 embed job 也
+  // 只是查不到节点后安静跳过）。语义检索只认 confirmed 节点，所以 proposed
+  // 节点的向量先算着存起来，审批通过即可立即被搜到（Phase2-开工计划.md 2.1）。
+  await enqueueEmbed(node.id);
+
+  return node;
 }
 
 export interface CreateEdgeInput {
@@ -424,6 +451,13 @@ export async function updateNode(
     .set(input)
     .where(eq(nodes.id, nodeId))
     .returning();
+
+  // 正文（title/body）变了才需要重算向量；只改 boardStatus（看板拖拽）不改
+  // 语义内容，跳过省一次 embedding 调用（Phase2-开工计划.md 2.1）。
+  if (input.title !== undefined || input.body !== undefined) {
+    await enqueueEmbed(node.id);
+  }
+
   return node;
 }
 

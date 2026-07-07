@@ -6,7 +6,14 @@ import type { z } from "zod";
  * 角色，剧本和戏路分开写。P1 只实现 capture 一份（lib/agents/contracts/
  * capture.ts）；retrieval/advance/judgment 先在这里立类型，P2+ 再填。
  */
-export type ContractName = "capture" | "retrieval" | "advance" | "judgment";
+export type ContractName =
+  | "capture"
+  | "retrieval"
+  | "advance"
+  | "judgment"
+  // import 是 capture 的冷启动变体（PRD R7"导入经捕获 Agent 熔成原生节点"），
+  // 但输出 schema 更宽（新建 feature + because 边），单列一份合同（决策 H）。
+  | "import";
 
 /**
  * 上下文装配的产出——Agent 被唤醒时查图得到的邻域快照

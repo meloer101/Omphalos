@@ -13,6 +13,11 @@ import { PgBoss } from "pg-boss";
 export const QUEUE = {
   capture: "capture",
   captureDeadLetter: "capture_dlq",
+  // P2 语义索引：节点写入后异步向量化（Phase2-开工计划.md 2.1）。
+  embed: "embed",
+  // P2 冷启动导入：每份历史文档一个 job，worker 并发即并行导入。
+  import: "import",
+  importDeadLetter: "import_dlq",
 } as const;
 
 let bossPromise: Promise<PgBoss> | null = null;
@@ -34,6 +39,20 @@ async function buildBoss(): Promise<PgBoss> {
     retryLimit: 1,
     retryDelay: 5,
     deadLetter: QUEUE.captureDeadLetter,
+  });
+
+  // 向量化队列（Phase2-开工计划.md 2.1）：embedding 是派生索引，失败重试
+  // 几次即可，不设死信——一个节点暂时没被索引到，只是它在语义检索里
+  // 暂时找不到，图本身不受影响，下次正文编辑会再次入队补上。
+  await boss.createQueue(QUEUE.embed, { retryLimit: 3, retryDelay: 10 });
+
+  // 导入队列（Phase2-开工计划.md 2.3）：与 capture 同构——每份历史文档
+  // 走一遍五段流水线，zod 校验重试耗尽就落死信供人工排查，图无污染。
+  await boss.createQueue(QUEUE.importDeadLetter);
+  await boss.createQueue(QUEUE.import, {
+    retryLimit: 1,
+    retryDelay: 5,
+    deadLetter: QUEUE.importDeadLetter,
   });
 
   return boss;

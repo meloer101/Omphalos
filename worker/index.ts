@@ -9,6 +9,11 @@ import {
   captureContract,
   type CaptureInput,
 } from "@/lib/agents/contracts/capture";
+import { embedNode } from "@/lib/embed";
+import {
+  importContract,
+  type ImportInput,
+} from "@/lib/agents/contracts/import";
 
 /**
  * Worker 入口（Phase1-开工计划.md 1.0）：独立 node 进程，`pnpm worker`
@@ -35,7 +40,28 @@ async function main() {
     }
   });
 
-  console.log("worker 已启动，监听 capture 队列...");
+  // 语义索引 job（Phase2-开工计划.md 2.1）：节点正文写入后由 lib/graph
+  // 入队，这里异步算向量写回 nodes.embedding。失败由队列 retryLimit 兜底。
+  await boss.work<{ nodeId: string }>(QUEUE.embed, async (jobs) => {
+    for (const job of jobs) {
+      await embedNode(job.data.nodeId);
+    }
+  });
+
+  // 导入 job（Phase2-开工计划.md 2.3）：每份历史文档走一遍 import 合同。
+  // 与 capture 不同，batchId 用上传时生成的（input.batchId）而非 job.id
+  // ——同一次上传的多份文档要在审批 tab 里归成一组（app/api/import 设值）。
+  await boss.work<ImportInput>(QUEUE.import, async (jobs) => {
+    for (const job of jobs) {
+      const result = await runPipeline(importContract, job.data);
+      console.log(
+        `[import] job ${job.id}（${job.data.docTitle ?? "无标题"}）完成：` +
+          `${result.nodeIds.length} 节点，${result.edgeIds.length} 边`,
+      );
+    }
+  });
+
+  console.log("worker 已启动，监听 capture / embed / import 队列...");
 
   const shutdown = async () => {
     console.log("worker 关闭中...");

@@ -6,5 +6,29 @@ model_list:
       model: deepseek/deepseek-v4-pro
       api_key: os.environ/DEEPSEEK_API_KEY
 
+  # 检索生成用的低延迟模型（Phase2-开工计划.md 决策 F）：追溯问答走这个，
+  # streamText 流式吐字，不用捕获那个 ~11s 的思考模型。换供应商只改这里。
+  - model_name: fast
+    litellm_params:
+      model: deepseek/deepseek-v4-flash
+      api_key: os.environ/DEEPSEEK_API_KEY
+
+  # 语义索引用的 embedding 模型（Phase2-开工计划.md 决策 E 修订）：本地
+  # bge-m3（1024 维），经宿主机上的 Ollama 提供，数据不出内网、零 API 费，
+  # 贴合自部署/数据敏感定位（OQ3）。api_base 走 host.docker.internal——
+  # LiteLLM 在容器里，127.0.0.1 是容器自己，得用这个别名回连宿主机 Ollama。
+  # 换回云端 embedding 只改这里，但换维度须同步改 schema 与向量索引迁移。
+  - model_name: embedding
+    litellm_params:
+      model: ollama/bge-m3
+      api_base: http://host.docker.internal:11434
+
+litellm_settings:
+  # AI SDK 的 embed() 会带上 OpenAI 标准的 encoding_format:'float'，但 Ollama
+  # 的 embedding 端点不认这个参数、会直接报 UnsupportedParamsError。开这个
+  # 开关让 LiteLLM 把下游不支持的参数丢掉再转发，而不是报错——应用层不必
+  # 为"某个 provider 不支持某参数"写特判，正是代理层该吸收的差异。
+  drop_params: true
+
 general_settings:
   master_key: os.environ/LITELLM_API_KEY
