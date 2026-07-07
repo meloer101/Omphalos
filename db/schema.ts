@@ -28,8 +28,9 @@ export const boardStatusEnum = pgEnum("board_status", BOARD_STATUSES);
 /**
  * 四类节点：证据 / 需求 / 任务 / 结果。project_id 是逻辑 scope 字段
  * （物理不分库，见 Agent架构设计.md "project 分割"）。
- * embedding 维度暂定 1536（待 D3 确定 embedding 模型后可能调整，
- * Phase 0 不填充，P2 语义检索才使用）。
+ * embedding 维度 1024：P2 定为本地 bge-m3（Phase2-开工计划.md 决策 E 修订，
+ * 贴合自部署/数据敏感定位，OQ3）。换 embedding 模型若维度不同，须同步改
+ * 这里 + 新一版向量索引迁移 + 重跑 embed。Phase 0 不填充，P2 语义检索才使用。
  */
 export const nodes = pgTable("nodes", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -41,7 +42,7 @@ export const nodes = pgTable("nodes", {
   // 仅 task 类型节点使用；其他类型忽略这个字段。与上面的 status
   // （信任账本轴）是两件完全不同的事，不要混用。
   boardStatus: boardStatusEnum("board_status").notNull().default("todo"),
-  embedding: vector("embedding", { dimensions: 1536 }),
+  embedding: vector("embedding", { dimensions: 1024 }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

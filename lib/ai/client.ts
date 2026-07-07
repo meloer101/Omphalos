@@ -41,10 +41,10 @@ export function getFastModel() {
 }
 
 /**
- * 语义索引用的 embedding 模型（Phase2-开工计划.md 决策 E）。走 OpenAI
- * 兼容 1536 维，正好匹配 db/schema.ts 的 `nodes.embedding vector(1536)`，
- * 零 schema 改动。换供应商/换本地模型只改 litellm/config.yaml 的
- * `embedding` 别名——注意换维度需同步改 schema 与向量索引迁移。
+ * 语义索引用的 embedding 模型（Phase2-开工计划.md 决策 E 修订）。走本地
+ * bge-m3（1024 维），匹配 db/schema.ts 的 `nodes.embedding vector(1024)`。
+ * 换供应商/维度只改 litellm/config.yaml 的 `embedding` 别名——注意换维度
+ * 需同步改 schema 与向量索引迁移。
  */
 export function getEmbeddingModel() {
   return getLitellmProvider().textEmbeddingModel("embedding");
