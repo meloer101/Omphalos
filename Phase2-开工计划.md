@@ -82,7 +82,17 @@
 
 **preview 手动核对**：`/inbox /board /roadmap /review /import` 全 200；导入页渲染正常；⌘K 面板正确开合、带 idle 提示；**关 AI 侧边栏后 Cmd-K 不挂载**（G5 确认）；`/api/retrieval` 请求正确抵达 LiteLLM `/embeddings`，模型不可用时干净降级为"出错了"而非卡死。
 
-> **⚠️ 验证方式说明（同 P0/P1 惯例）**：本环境 `DEEPSEEK_API_KEY`/`OPENAI_API_KEY` 未配、且在跑的 LiteLLM 容器是 12 小时前用旧 config 起的（无 `embedding`/`fast` 模型）。因此**依赖真实模型的 5 步 demo 端到端（真向量化 + 真生成 + 真熔图）尚未在本机跑通**——失败点确认为纯环境/供应商配置（请求已正确成形并路由到 LiteLLM，报错是 proxy 侧"Invalid model name / 无 key"），不是代码缺陷。补齐步骤：填 `DEEPSEEK_API_KEY`+`OPENAI_API_KEY` → `pnpm litellm:stop && pnpm litellm:start` 重载新 config → 起 `pnpm worker` → 跑 `RUN_RETRIEVAL_EVAL=1` 端到端评估 + 手动走 5 步 demo。确定性的零幻觉护栏已由 `cite.test.ts` 脱机坐实，不依赖上述环境。
+**✅ 出口 5 步 demo 端到端跑通（2026-07-06，本地模型）**：
+1. **导入**：一份《结算页支付方式决策记录》.md → `/api/import` → DeepSeek（default）熔成 **7 节点（3 需求 + 4 证据）+ 4 因果边**（2×`because`、2×`supports`），全部 proposed 且带出处/batchId；节点写入即由 `embed` 队列用 bge-m3 向量化（7/7 覆盖）。
+2. **审批**：审批 tab「整批接受」→ 7 节点 + 4 边全部 confirmed（<1 分钟）。
+3-4. **⌘K 追溯**：问"结算页当初为什么不做微信支付？"→ 真实两段式（bge-m3 向量定位入口 → 沿 confirmed 边遍历 → DeepSeek fast 流式生成）→ 自然语言答案、**6 个行内蓝链直达真实节点、0 错误引用**。拒答用例（暗色模式/全局搜索）明确返回"图里没有记录"，不推测。
+5. **降级**：关侧边栏 → Cmd-K 卸载、收件箱/看板全功能可用（G5）。
+
+> **本地模型环境（决策 E 修订落地）**：embedding 改用宿主机 Ollama 的 **bge-m3（1024 维）**，经 LiteLLM `host.docker.internal` 回连，数据不出内网、零 API key（贴合 OQ3 自部署/数据敏感定位）。生成仍用 DeepSeek（容器内已有 key）。
+>
+> **运行中修掉的两个真实问题**：① `fast` 别名原指向不存在的 `deepseek-v4`，改 `deepseek-v4-flash`；② AI SDK 的 `embed()` 带 `encoding_format:'float'`，Ollama 端点报 `UnsupportedParamsError`——在 LiteLLM 开 `drop_params: true` 让代理层吸收 provider 差异。另：P1 事故丢失的 `litellm/.env`（gitignored）已从运行中的容器取回 key 重建。
+>
+> **注意**：本地 dev DB 与 vitest 测试库是同一个（test-helpers 的 `resetGraph` 会 TRUNCATE）——跑 `pnpm test` 会清掉 demo 图，演示前需重新导入。
 
 ---
 
