@@ -22,6 +22,10 @@ jobs:
           --health-retries 5
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:54322/postgres
+      # 物理只读角色由迁移 0003 创建（下面 Apply migrations 步骤会跑到），
+      # readonly-role.test.ts 和 P2 检索合同用它。密码与 db/migrations/
+      # 0003_readonly_role.sql 里 CREATE ROLE 的字面量保持一致。
+      DATABASE_URL_READONLY: postgresql://graph_readonly:graph_readonly_dev_only@localhost:54322/postgres
     steps:
       - uses: actions/checkout@v4
 
