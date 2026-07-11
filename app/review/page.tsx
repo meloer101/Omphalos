@@ -1,23 +1,20 @@
 import { listPendingReview } from "@/lib/graph";
 import { DEFAULT_PROJECT_ID } from "@/lib/config";
-import { ReviewPanel } from "@/components/review-panel";
+import { ReviewWorkspace } from "@/components/review-workspace";
 
 /**
- * 审批的独立宽屏页面（Phase1-开工计划.md 1.3）。同一套渲染/数据/
- * Server Actions 也被侧边栏审批 tab 复用（components/review-panel.tsx）
- * ——这里只是加一层页面级的标题和留白，实际逻辑不在这个文件里。
+ * 审批页（Phase3 改版）：三栏「导航 | 列表 | 就地预览」。此前这个页面在
+ * (workbench) 路由组之外、套不到三栏外壳，所以没有左导航——现在自己带上
+ * WorkbenchNav 修一致性；点列表项在右侧预览、不再整页跳转（详见计划文件）。
+ * 侧边栏的「审批」tab 仍用 components/review-panel.tsx，不受影响。
  */
+// 审批列表是每次请求的实时快照，不能被构建期静态预渲染成陈旧数据。
+export const dynamic = "force-dynamic";
+
 export default async function ReviewPage() {
   const review = await listPendingReview(DEFAULT_PROJECT_ID);
 
-  return (
-    <div className="p-6 max-w-2xl">
-      <h1 className="text-lg font-medium mb-1">审批</h1>
-      <p className="text-xs text-black/40 dark:text-white/40 mb-6">
-        高风险边（支撑/因为/验证/证伪）必须在这里显式确认才对检索可见；
-        低风险边（重复/阻塞）已自动生效，这里只是给你撤销的机会。
-      </p>
-      <ReviewPanel review={review} />
-    </div>
-  );
+  // ReviewWorkspace 自己是一个撑满视口高度的横向 PanelGroup（导航/列表/预览
+  // 三栏可拖），所以这里不再套外层 flex 容器。
+  return <ReviewWorkspace pending={review.pending} />;
 }

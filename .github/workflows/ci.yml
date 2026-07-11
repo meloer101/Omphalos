@@ -26,6 +26,10 @@ jobs:
       # readonly-role.test.ts 和 P2 检索合同用它。密码与 db/migrations/
       # 0003_readonly_role.sql 里 CREATE ROLE 的字面量保持一致。
       DATABASE_URL_READONLY: postgresql://graph_readonly:graph_readonly_dev_only@localhost:54322/postgres
+      # Phase 3 决策 J（拆库）：vitest 走独立测试库。CI 也镜像本地——
+      # 建 pmeverything_test 并单独迁移，pnpm test 只碰它。
+      DATABASE_URL_TEST: postgresql://postgres:postgres@localhost:54322/pmeverything_test
+      DATABASE_URL_READONLY_TEST: postgresql://graph_readonly:graph_readonly_dev_only@localhost:54322/pmeverything_test
     steps:
       - uses: actions/checkout@v4
 
@@ -40,8 +44,16 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Apply migrations
-        run: pnpm exec drizzle-kit migrate
+      # 建独立测试库（ubuntu-latest 预装 psql 客户端）。迁移 0007 会给
+      # graph_readonly 授 CONNECT 到本库（决策 J）。
+      - name: Create test database
+        run: PGPASSWORD=postgres psql -h localhost -p 54322 -U postgres -d postgres -c 'CREATE DATABASE pmeverything_test'
+
+      - name: Apply migrations (dev DB)
+        run: pnpm db:migrate
+
+      - name: Apply migrations (test DB)
+        run: pnpm db:migrate:test
 
       - run: pnpm lint
       - run: pnpm typecheck

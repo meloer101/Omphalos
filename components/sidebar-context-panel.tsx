@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { EDGE_TYPE_LABELS, NODE_TYPE_LABELS } from "@/lib/labels";
+import { ContextFramework } from "@/components/context-framework";
+import { NODE_TYPE_LABELS } from "@/lib/labels";
 import type { NodeType, EdgeType, EdgeStatus } from "@/db/enums";
 
 interface ContextEdge {
@@ -83,7 +84,8 @@ export function SidebarContextPanel() {
     );
   }
 
-  const hasEdges = context.outgoing.length > 0 || context.incoming.length > 0;
+  const linkClass =
+    "underline font-semibold text-black/80 dark:text-white/80 hover:text-black dark:hover:text-white";
 
   return (
     <div className="flex flex-col gap-3 text-sm">
@@ -91,61 +93,30 @@ export function SidebarContextPanel() {
         <span className="text-black/40 dark:text-white/40">
           [{NODE_TYPE_LABELS[context.node.type]}]{" "}
         </span>
-        <Link href={`/node/${context.node.id}`} className="font-medium underline">
-          {context.node.title}
-        </Link>
+        <span className="font-medium">{context.node.title}</span>
       </div>
 
-      {context.outgoing.length > 0 && (
-        <div>
-          <div className="text-xs text-black/40 dark:text-white/40 mb-1">出边</div>
-          <ul className="flex flex-col gap-1">
-            {context.outgoing.map((e) => (
-              <li key={e.id}>
-                <span className="text-black/40 dark:text-white/40">
-                  {EDGE_TYPE_LABELS[e.type]} →{" "}
-                </span>
-                {e.targetId ? (
-                  <Link href={`/node/${e.targetId}`} className="underline">
-                    {e.targetTitle ?? "（未知节点）"}
-                  </Link>
-                ) : (
-                  "（未知节点）"
-                )}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {context.incoming.length > 0 && (
-        <div>
-          <div className="text-xs text-black/40 dark:text-white/40 mb-1">入边</div>
-          <ul className="flex flex-col gap-1">
-            {context.incoming.map((e) => (
-              <li key={e.id}>
-                {e.sourceId ? (
-                  <Link href={`/node/${e.sourceId}`} className="underline">
-                    {e.sourceTitle ?? "（未知节点）"}
-                  </Link>
-                ) : (
-                  "（未知节点）"
-                )}
-                <span className="text-black/40 dark:text-white/40">
-                  {" "}
-                  —{EDGE_TYPE_LABELS[e.type]}→ 本节点
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {!hasEdges && (
-        <p className="text-black/40 dark:text-white/40">
-          这个节点还没有任何边。
-        </p>
-      )}
+      {/* 上下文关系框架图（与审批预览同一套 components/context-framework.tsx）。
+          侧边栏里对端节点是跳转链接（Link），预览里是就地切换（button）。 */}
+      <ContextFramework
+        incoming={context.incoming.map((e) => ({
+          id: e.id,
+          type: e.type,
+          otherId: e.sourceId,
+          otherTitle: e.sourceTitle,
+        }))}
+        outgoing={context.outgoing.map((e) => ({
+          id: e.id,
+          type: e.type,
+          otherId: e.targetId,
+          otherTitle: e.targetTitle,
+        }))}
+        renderLink={(id, title) => (
+          <Link href={`/node/${id}`} className={linkClass}>
+            {title}
+          </Link>
+        )}
+      />
     </div>
   );
 }

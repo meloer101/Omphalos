@@ -33,11 +33,31 @@ function buildHandleMap(sources: CitationSource[]): Map<string, CitationSource> 
   return new Map(sources.map((s) => [s.handle, s]));
 }
 
+/**
+ * 引用点击率埋点（Phase3 3.1，决策 L）。行内蓝链被点即发一条 beacon——
+ * beacon 专为"页面正在跳转时仍要把请求送出去"设计，正好配深链导航。
+ * 失败无所谓，绝不阻塞跳转。
+ */
+function reportCitationClick(nodeId: string, question: string) {
+  try {
+    const body = JSON.stringify({ nodeId, question });
+    navigator.sendBeacon?.(
+      "/api/metrics/citation-click",
+      new Blob([body], { type: "application/json" }),
+    );
+  } catch {
+    // 埋点尽力而为，点击导航永远优先。
+  }
+}
+
 export function CmdKSearch() {
   const [open, setOpen] = useState(false);
   const [question, setQuestion] = useState("");
   const [state, setState] = useState<State>({ phase: "idle" });
   const inputRef = useRef<HTMLInputElement>(null);
+  // 产生当前答案的那个问题——引用点击埋点用它，避免读到用户随后又改写的
+  // 输入框内容。
+  const askedQuestionRef = useRef("");
 
   // 全局快捷键：⌘K / Ctrl-K 开关；Esc 关闭。
   useEffect(() => {
@@ -60,6 +80,7 @@ export function CmdKSearch() {
   const ask = useCallback(async () => {
     const q = question.trim();
     if (!q) return;
+    askedQuestionRef.current = q;
     setState({ phase: "loading" });
 
     try {
@@ -182,6 +203,9 @@ export function CmdKSearch() {
                     <Link
                       key={i}
                       href={`/node/${seg.id}`}
+                      onClick={() =>
+                        reportCitationClick(seg.id, askedQuestionRef.current)
+                      }
                       className="text-blue-600 dark:text-blue-400 underline decoration-dotted underline-offset-2 hover:decoration-solid"
                       title={`${NODE_TYPE_LABELS[seg.nodeType]}：${seg.title}`}
                     >

@@ -50,6 +50,20 @@
       "when": 1783359800000,
       "tag": "0006_embedding_dim_1024",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1783900000000,
+      "tag": "0007_readonly_connect_current_db",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1783900100000,
+      "tag": "0008_events",
+      "breakpoints": true
     }
   ]
 }

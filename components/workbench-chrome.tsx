@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import Link from "next/link";
 import { SIDEBAR_OPEN_COOKIE } from "@/lib/config";
+import { WorkbenchNav } from "./workbench-nav";
 import { SidebarContextPanel } from "./sidebar-context-panel";
 import { SidebarCapturePanel } from "./sidebar-capture-panel";
 import { SidebarLiveRefresh } from "./sidebar-live-refresh";
@@ -58,46 +58,17 @@ export function WorkbenchChrome({
 
   return (
     <div className="flex h-full min-h-screen">
-      <nav className="w-56 shrink-0 border-r border-black/10 dark:border-white/10 p-4 flex flex-col gap-1">
-        <div className="text-sm font-medium mb-3 px-2">Omphalos</div>
-        <Link
-          className="px-2 py-1.5 rounded text-sm hover:bg-black/5 dark:hover:bg-white/5"
-          href="/inbox"
-        >
-          反馈收件箱
-        </Link>
-        <Link
-          className="px-2 py-1.5 rounded text-sm hover:bg-black/5 dark:hover:bg-white/5"
-          href="/board"
-        >
-          看板
-        </Link>
-        <Link
-          className="px-2 py-1.5 rounded text-sm hover:bg-black/5 dark:hover:bg-white/5"
-          href="/roadmap"
-        >
-          Roadmap
-        </Link>
-        <Link
-          className="px-2 py-1.5 rounded text-sm hover:bg-black/5 dark:hover:bg-white/5"
-          href="/review"
-        >
-          审批
-        </Link>
-        <Link
-          className="px-2 py-1.5 rounded text-sm hover:bg-black/5 dark:hover:bg-white/5"
-          href="/import"
-        >
-          导入
-        </Link>
-        <button
-          type="button"
-          onClick={toggle}
-          className="mt-auto px-2 py-1.5 rounded text-sm text-left hover:bg-black/5 dark:hover:bg-white/5"
-        >
-          {open ? "关闭 AI 侧边栏" : "打开 AI 侧边栏"}
-        </button>
-      </nav>
+      <WorkbenchNav
+        footer={
+          <button
+            type="button"
+            onClick={toggle}
+            className="w-full px-2 py-1.5 rounded text-sm text-left hover:bg-black/5 dark:hover:bg-white/5"
+          >
+            {open ? "关闭 AI 侧边栏" : "打开 AI 侧边栏"}
+          </button>
+        }
+      />
 
       <main className="flex-1 min-w-0 overflow-auto">{children}</main>
 

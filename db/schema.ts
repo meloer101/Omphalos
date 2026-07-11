@@ -104,9 +104,25 @@ export const auditLog = pgTable("audit_log", {
   at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/**
+ * Phase 3 埋点事件表（决策 K/L，迁移 0008）。dogfooding Leading 指标里
+ * 三条需前端/检索侧采集的（拒答占比 / 引用点击率 / 审批耗时）落这里；
+ * 捕获接受率、高风险边错连率两条从 audit_log 派生，不进本表。
+ * 扁平设计：kind 分类，payload 放各自字段。天然只 append。
+ */
+export const events = pgTable("events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  kind: text("kind").notNull(), // 'retrieval' | 'citation_click' | 'approval_session'
+  payload: jsonb("payload").notNull().default({}),
+  projectId: uuid("project_id").notNull(),
+  at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export type Node = typeof nodes.$inferSelect;
 export type NewNode = typeof nodes.$inferInsert;
 export type Edge = typeof edges.$inferSelect;
 export type NewEdge = typeof edges.$inferInsert;
 export type Provenance = typeof provenance.$inferSelect;
 export type AuditLogEntry = typeof auditLog.$inferSelect;
+export type Event = typeof events.$inferSelect;
+export type NewEvent = typeof events.$inferInsert;

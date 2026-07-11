@@ -191,11 +191,17 @@ export async function confirmEdge(edgeId: string, actor: string): Promise<Edge> 
 /** 拒绝一条提议中的边——直接删除（图无污染），历史留在 audit_log。 */
 export async function rejectEdge(edgeId: string, actor: string): Promise<void> {
   await db.transaction(async (tx) => {
+    // 先查边拿到类型：PRD R5 要求"每次接受/拒绝按边类型记录"（为 v2 放权
+    // 攒数据），confirmEdge/revertEdge 都记了 edgeType，拒绝也必须记——否则
+    // 审批日志里被拒的边 edge_type=NULL，按边类型统计接受率/错连率时被漏掉
+    // （Phase3 dogfooding 首审即暴露：高风险边错连率误显示 0%）。
+    const [edge] = await tx.select().from(edges).where(eq(edges.id, edgeId));
     await tx.insert(auditLog).values({
       targetType: "edge",
       targetId: edgeId,
       action: "rejected",
       actor,
+      edgeType: edge?.type,
     });
     await tx.delete(edges).where(eq(edges.id, edgeId));
   });

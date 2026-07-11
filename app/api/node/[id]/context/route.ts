@@ -30,7 +30,15 @@ export async function GET(
   const nodeById = new Map(allNodes.map((n) => [n.id, n]));
 
   return NextResponse.json({
-    node: { id: node.id, title: node.title, type: node.type, status: node.status },
+    // body 加进来，供审批页就地预览（components/review-preview.tsx）一次
+    // fetch 拿全正文 + 上下文。侧边栏那个消费方多一个字段无害、不用改。
+    node: {
+      id: node.id,
+      title: node.title,
+      type: node.type,
+      status: node.status,
+      body: node.body,
+    },
     outgoing: outgoing.map((e) => ({
       id: e.id,
       type: e.type,

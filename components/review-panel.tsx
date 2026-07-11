@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { PendingReview, ReviewItem, ReviewEdgeItem } from "@/lib/graph";
 import { NODE_TYPE_LABELS, EDGE_TYPE_LABELS } from "@/lib/labels";
 import { groupReviewItems } from "@/app/review/group";
+import { ApprovalTimer } from "@/components/approval-timer";
 import {
   acceptNode,
   rejectNode,
@@ -44,6 +45,9 @@ export function ReviewPanel({ review }: { review: PendingReview }) {
 
   return (
     <div className="flex flex-col gap-6">
+      {/* 审批耗时埋点（Phase3 3.1）——只计时不渲染，两个 ReviewPanel 用处
+          （/review 页 + 侧边栏 tab）都自动带上。 */}
+      <ApprovalTimer pendingCount={pending.length} />
       <section>
         <h2 className="text-sm font-medium mb-3">
           待确认

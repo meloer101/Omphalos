@@ -1,5 +1,6 @@
 import { answerQuestion, NO_RECORD_MESSAGE } from "@/lib/retrieval/answer";
 import { DEFAULT_PROJECT_ID } from "@/lib/config";
+import { emitEvent } from "@/lib/metrics/emit";
 
 /**
  * 追溯问答入口（Phase2-开工计划.md 2.2，PRD R4）。Cmd-K 把问题 POST 到
@@ -35,6 +36,8 @@ export async function POST(request: Request) {
     // 没配好或不可用。返回干净的错误 JSON，让 Cmd-K 面板显示"出错了"，
     // 而不是让前端卡在"检索中…"（错误里不回传细节，避免泄露内部配置）。
     console.error("[retrieval] answerQuestion 失败:", err);
+    // 拒答占比的分母是全部 retrieval 事件——出错也是一次追溯尝试，记下来。
+    emitEvent("retrieval", { outcome: "error" });
     return Response.json(
       { kind: "error", error: "检索暂时不可用" },
       { status: 500 },
@@ -42,11 +45,21 @@ export async function POST(request: Request) {
   }
 
   if (result.kind === "no_record") {
+    // "图里没有记录"——拒答占比的分子（决策 L）。随图变满应逐步下降。
+    emitEvent("retrieval", { outcome: "no_record" });
     return Response.json({ kind: "no_record", message: NO_RECORD_MESSAGE });
   }
 
   const encoder = new TextEncoder();
   const { scope, sources, textStream } = result;
+
+  // 成功答出——拒答占比的另一半，并带上 scope / 引用条数便于分析。
+  // 引用点击率的分母也是这些 answer 事件（决策 L）。
+  emitEvent("retrieval", {
+    outcome: "answer",
+    scope,
+    sourceCount: sources.length,
+  });
 
   const stream = new ReadableStream({
     async start(controller) {
